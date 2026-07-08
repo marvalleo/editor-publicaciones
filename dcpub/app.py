@@ -402,6 +402,11 @@ class App(tk.Tk):
             return
         layer = self._selected
         kind = self._kind_of(layer)
+        if kind == "photo":
+            self.v_readout.set(
+                f"Foto · Zoom: {layer.zoom:.2f}  "
+                f"Recorte: {layer.offset_x:.2f}, {layer.offset_y:.2f}")
+            return
         tam = layer.w if kind == "logo" else layer.size
         self.v_readout.set(
             f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  Tamaño: {tam:.3f}")
@@ -411,6 +416,8 @@ class App(tk.Tk):
         if self._selected is None:
             return
         kind = self._kind_of(self._selected)
+        if kind is None or kind == "photo":
+            return
         bb = self._last_bboxes.get(kind)
         if not bb:
             return
@@ -481,6 +488,9 @@ class App(tk.Tk):
         if self._selected is None:
             return
         if isinstance(self.focus_get(), (tk.Entry, tk.Text)):
+            return
+        kind = self._kind_of(self._selected)
+        if kind == "photo":
             return
         layer = self._selected
         layer.x = min(1.0, max(0.0, layer.x + dx_sign * step))
