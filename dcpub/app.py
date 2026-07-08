@@ -73,6 +73,16 @@ def _snap_position(new_x0, new_y0, bw, bh, iw, ih):
     return new_x0, new_y0, guides
 
 
+def _center_position(axis, x0, y0, bw, bh, iw, ih):
+    """Centra la caja (esquina x0,y0, ancho bw, alto bh) en el eje pedido
+    ("x", "y" o "both") dentro del lienzo (iw x ih). Devuelve (x0, y0)."""
+    if axis in ("x", "both"):
+        x0 = iw / 2 - bw / 2
+    if axis in ("y", "both"):
+        y0 = ih / 2 - bh / 2
+    return x0, y0
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
