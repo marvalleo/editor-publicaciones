@@ -1,14 +1,14 @@
-"""Interfaz gráfica: ventana principal del editor (portada de v2.0)."""
+"""Interfaz gráfica: ventana principal del editor (portada de v2.0, con formatos y foto cover/zoom/offset)."""
 
 import threading
 from pathlib import Path
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 
 from PIL import Image, ImageTk
 
-from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS
+from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS, FORMATOS
 from .fonts import FontManager
 from .render import compose
 
@@ -27,6 +27,9 @@ DEFAULTS = {
     "sub":   {"x": 0.50,  "y": 0.55,  "size": 0.050},
     "desc":  {"x": 0.05,  "y": 0.808, "size": 0.033},
 }
+
+# Valores por defecto de la foto (zoom mínimo = exactamente "cover", centrada)
+PHOTO_DEFAULTS = {"zoom": 1.0, "offset_x": 0.5, "offset_y": 0.5}
 
 # Rango de los sliders de tamaño por elemento (fracción del ancho)
 SIZE_RANGE = {
@@ -51,6 +54,10 @@ class App(tk.Tk):
 
         # Estado de los elementos (copia de los defaults)
         self.el = {k: dict(v) for k, v in DEFAULTS.items()}
+        self.el["photo"] = dict(PHOTO_DEFAULTS)
+
+        # Formato activo (empieza en el primero de la lista: 1080x1350 / 4:5)
+        self.format = dict(FORMATOS[0])
 
         # Variables de texto
         self.v_photo = tk.StringVar()
@@ -58,9 +65,10 @@ class App(tk.Tk):
         self.v_sub   = tk.StringVar(value="frase secundaria")
         self.v_desc  = tk.StringVar()
         self.v_icon  = tk.StringVar(value="planta")
+        self.v_format = tk.StringVar(value=FORMATOS[0]["label"])
         self.v_status = tk.StringVar(value="Listo.")
 
-        # Variables de sliders {elem: {"size":var,"x":var,"y":var}}
+        # Variables de sliders {elem: {"size":var,"x":var,"y":var}} (y "photo": zoom/offset_x/offset_y)
         self.ctrl = {}
 
         # Control interno de render
@@ -126,6 +134,16 @@ class App(tk.Tk):
         tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
                  font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(16, 10), **pad)
 
+        # Formato
+        tk.Label(left, text="🖼  Formato", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 9)).pack(anchor="w", **pad)
+        self._formato_labels = [f["label"] for f in FORMATOS] + ["Personalizado…"]
+        cb_formato = ttk.Combobox(left, textvariable=self.v_format, values=self._formato_labels,
+                                  state="readonly", font=("Segoe UI", 9))
+        cb_formato.pack(fill=tk.X, pady=(2, 10), **pad)
+        cb_formato.bind("<<ComboboxSelected>>", lambda e: self._on_format_change())
+
+        # Foto
         tk.Label(left, text="📷  Foto", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", **pad)
         row = tk.Frame(left, bg=PANEL)
@@ -136,6 +154,7 @@ class App(tk.Tk):
         tk.Button(row, text="…", bg="#3d3d3d", fg=TEXT, relief="flat", padx=8,
                   command=self._browse).pack(side=tk.LEFT, padx=(4, 0))
 
+        # Título (multilínea)
         tk.Label(left, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         self.txt_title = tk.Text(left, height=3, bg=FIELD, fg=TEXT, insertbackground=TEXT,
@@ -144,6 +163,7 @@ class App(tk.Tk):
         self.txt_title.pack(fill=tk.X, pady=(0, 8), **pad)
         self.txt_title.bind("<KeyRelease>", lambda e: self._schedule_render())
 
+        # Subtítulo
         tk.Label(left, text="✨  Subtítulo (cursiva verde)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         e_sub = tk.Entry(left, textvariable=self.v_sub, bg=FIELD, fg=TEXT,
@@ -151,6 +171,7 @@ class App(tk.Tk):
         e_sub.pack(fill=tk.X, pady=(0, 8), **pad)
         e_sub.bind("<KeyRelease>", lambda e: self._schedule_render())
 
+        # Descripción
         tk.Label(left, text="📝  Descripción (recuadro inferior)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         self.txt_desc = tk.Text(left, height=4, bg=FIELD, fg=TEXT, insertbackground=TEXT,
@@ -158,6 +179,7 @@ class App(tk.Tk):
         self.txt_desc.pack(fill=tk.X, pady=(0, 8), **pad)
         self.txt_desc.bind("<KeyRelease>", lambda e: self._schedule_render())
 
+        # Ícono
         tk.Label(left, text="🔖  Ícono del recuadro", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         cb = ttk.Combobox(left, textvariable=self.v_icon, values=ICONS,
@@ -165,6 +187,7 @@ class App(tk.Tk):
         cb.pack(fill=tk.X, pady=(0, 10), **pad)
         cb.bind("<<ComboboxSelected>>", lambda e: self._schedule_render())
 
+        # Botones
         tk.Button(left, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 10), pady=8, command=self._render_now).pack(
             fill=tk.X, pady=(6, 4), **pad)
@@ -183,12 +206,26 @@ class App(tk.Tk):
                  bg=PANEL2, fg=MUTED, font=("Segoe UI", 8), justify="left").pack(
             anchor="w", padx=16, pady=(0, 8))
 
+        self._build_photo_controls(right)
+
         for elem in ELEMENTS:
             self._build_control_group(right, elem)
 
         tk.Button(right, text="↺  Restablecer posiciones", bg="#3d3d3d", fg=TEXT,
                   relief="flat", font=("Segoe UI", 9), pady=6,
                   command=self._reset).pack(fill=tk.X, padx=16, pady=(12, 16))
+
+    def _build_photo_controls(self, parent):
+        card = tk.Frame(parent, bg=PANEL, padx=12, pady=8)
+        card.pack(fill=tk.X, padx=12, pady=5)
+
+        tk.Label(card, text="Foto", bg=PANEL, fg=ACCENT,
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
+
+        self.ctrl["photo"] = {}
+        self._slider(card, "photo", "zoom", "Zoom", 1.0, 3.0)
+        self._slider(card, "photo", "offset_x", "Posición X del recorte", 0.0, 1.0)
+        self._slider(card, "photo", "offset_y", "Posición Y del recorte", 0.0, 1.0)
 
     def _build_control_group(self, parent, elem):
         card = tk.Frame(parent, bg=PANEL, padx=12, pady=8)
@@ -227,12 +264,54 @@ class App(tk.Tk):
         for elem in ELEMENTS:
             for param in ("size", "x", "y"):
                 self.ctrl[elem][param].set(self.el[elem][param])
+        for param in ("zoom", "offset_x", "offset_y"):
+            self.ctrl["photo"][param].set(self.el["photo"][param])
         self._updating = False
 
     def _reset(self):
         self.el = {k: dict(v) for k, v in DEFAULTS.items()}
+        self.el["photo"] = dict(PHOTO_DEFAULTS)
         self._sync_sliders()
         self._schedule_render()
+
+    # ── Formato ────────────────────────────────────────────────
+    def _on_format_change(self):
+        label = self.v_format.get()
+        if label == "Personalizado…":
+            w = simpledialog.askinteger("Formato personalizado", "Ancho (px):",
+                                         initialvalue=self.format["w"], minvalue=100,
+                                         maxvalue=8000, parent=self)
+            if not w:
+                self._sync_format_label()
+                return
+            h = simpledialog.askinteger("Formato personalizado", "Alto (px):",
+                                         initialvalue=self.format["h"], minvalue=100,
+                                         maxvalue=8000, parent=self)
+            if not h:
+                self._sync_format_label()
+                return
+            self.format = {"name": "personalizado", "label": f"{w}×{h} (personalizado)",
+                            "w": w, "h": h}
+            self.v_format.set(self.format["label"])
+        else:
+            self.format = next(f for f in FORMATOS if f["label"] == label)
+        self._schedule_render()
+
+    def _sync_format_label(self):
+        """Restaura el texto del combobox al formato activo (p.ej. si se cancela el diálogo)."""
+        self.v_format.set(self.format.get("label", FORMATOS[0]["label"]))
+
+    def _canvas_size_for(self, max_side):
+        """Calcula (ancho, alto) en px del lienzo para el formato actual, con el
+        lado mayor igual a max_side, manteniendo la proporción del formato."""
+        fw, fh = self.format["w"], self.format["h"]
+        if fh >= fw:
+            h = max_side
+            w = max(1, round(max_side * fw / fh))
+        else:
+            w = max_side
+            h = max(1, round(max_side * fh / fw))
+        return (w, h)
 
     # ── Foto ───────────────────────────────────────────────────
     def _browse(self):
@@ -244,9 +323,10 @@ class App(tk.Tk):
             self.v_photo.set(path)
             self._schedule_render()
 
-    # ── Capas actuales (Fase 1.1: dicts; Fase 1.2 las formaliza como Layer) ──
+    # ── Capas actuales (Fase 1.3: dicts; Fase 1.4 conecta el modelo formal) ──
     def _build_layers(self):
         return [
+            {"type": "photo", "src": self.v_photo.get().strip(), **self.el["photo"]},
             {"type": "logo", **self.el["logo"]},
             {"type": "title", "text": self.txt_title.get("1.0", "end-1c"), **self.el["title"]},
             {"type": "sub", "text": self.v_sub.get(), **self.el["sub"]},
@@ -267,9 +347,10 @@ class App(tk.Tk):
             return
         cw = max(200, self.canvas.winfo_width())
         ch = max(200, self.canvas.winfo_height())
-        size = max(400, min(cw, ch, 1000))
+        max_side = max(400, min(cw, ch, 1000))
+        canvas_size = self._canvas_size_for(max_side)
         try:
-            img, bboxes = compose(path, self._build_layers(), size, self.font_manager)
+            img, bboxes = compose(self._build_layers(), canvas_size, self.font_manager)
             iw, ih = img.size
             fit = min(cw / iw, ch / ih, 1.0)
             if fit < 1.0:
@@ -348,8 +429,9 @@ class App(tk.Tk):
         try:
             with Image.open(path) as im:
                 native = max(im.size)
-            full = min(max(native, 1200), 2400)
-            img, _ = compose(path, self._build_layers(), full, self.font_manager)
+            max_side = min(max(native, 1200), 2400)
+            canvas_size = self._canvas_size_for(max_side)
+            img, _ = compose(self._build_layers(), canvas_size, self.font_manager)
             img.convert("RGB").save(str(out_path), quality=95)
             self.v_status.set(f"✅  Guardada en: publicaciones/{out_path.name}")
             messagebox.showinfo("¡Listo!", f"Imagen guardada en:\n{out_path}")
