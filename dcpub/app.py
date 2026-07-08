@@ -442,6 +442,8 @@ class App(tk.Tk):
     def _nudge(self, dx_sign, dy_sign, step):
         if self._selected is None:
             return
+        if isinstance(self.focus_get(), (tk.Entry, tk.Text)):
+            return
         layer = self._selected
         layer.x = min(1.0, max(0.0, layer.x + dx_sign * step))
         layer.y = min(1.0, max(0.0, layer.y + dy_sign * step))
