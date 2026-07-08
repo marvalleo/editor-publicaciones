@@ -69,6 +69,101 @@ class TestCompose(unittest.TestCase):
         lines = wrap_text("una dos tres cuatro cinco seis siete ocho", font, 80, draw)
         self.assertGreater(len(lines), 1)
 
+    def test_opacity_default_matches_explicit_full_opacity(self):
+        layers_default = self._layers()
+        layers_explicit = [dict(l, opacity=1.0) for l in self._layers()]
+        img_a, _ = compose(layers_default, (400, 500), self.font_manager)
+        img_b, _ = compose(layers_explicit, (400, 500), self.font_manager)
+        self.assertEqual(list(img_a.getdata()), list(img_b.getdata()))
+
+    def test_logo_opacity_zero_makes_it_invisible(self):
+        layers_with = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "logo", "x": 0.40, "y": 0.02, "size": 0.20, "opacity": 0.0},
+        ]
+        layers_without = [
+            {"type": "photo", "src": str(self.photo_path)},
+        ]
+        img_with, _ = compose(layers_with, (400, 500), self.font_manager)
+        img_without, _ = compose(layers_without, (400, 500), self.font_manager)
+        self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
+
+    def test_title_opacity_reduces_text_alpha(self):
+        opaque = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Hola", "x": 0.055, "y": 0.42, "size": 0.15, "opacity": 1.0},
+        ]
+        faded = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Hola", "x": 0.055, "y": 0.42, "size": 0.15, "opacity": 0.3},
+        ]
+        img_opaque, _ = compose(opaque, (400, 500), self.font_manager)
+        img_faded, _ = compose(faded, (400, 500), self.font_manager)
+        self.assertNotEqual(list(img_opaque.getdata()), list(img_faded.getdata()))
+
+    def test_desc_box_opacity_zero_makes_box_invisible(self):
+        layers_with = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "desc", "text": "Descripción de prueba.", "icon": "ninguno",
+             "x": 0.05, "y": 0.808, "size": 0.033, "opacity": 0.0},
+        ]
+        layers_without = [
+            {"type": "photo", "src": str(self.photo_path)},
+        ]
+        img_with, _ = compose(layers_with, (400, 500), self.font_manager)
+        img_without, _ = compose(layers_without, (400, 500), self.font_manager)
+        self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
+
+    def test_desc_bbox_present_even_at_zero_opacity(self):
+        layers = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "desc", "text": "Descripción de prueba.", "icon": "planta",
+             "x": 0.05, "y": 0.808, "size": 0.033, "opacity": 0.0},
+        ]
+        img, bboxes = compose(layers, (400, 500), self.font_manager)
+        self.assertIn("desc", bboxes)
+
+    def test_desc_icon_partial_opacity_blends_instead_of_overwriting(self):
+        opaque = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "desc", "text": "X", "icon": "planta",
+             "x": 0.05, "y": 0.808, "size": 0.033, "opacity": 1.0},
+        ]
+        faded = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "desc", "text": "X", "icon": "planta",
+             "x": 0.05, "y": 0.808, "size": 0.033, "opacity": 0.5},
+        ]
+        no_desc = [{"type": "photo", "src": str(self.photo_path)}]
+        img_opaque, _ = compose(opaque, (400, 500), self.font_manager)
+        img_faded, _ = compose(faded, (400, 500), self.font_manager)
+        img_none, _ = compose(no_desc, (400, 500), self.font_manager)
+        faded_pixels = list(img_faded.getdata())
+        # A pixel at partial opacity must differ from BOTH the fully-opaque
+        # version AND the version with no desc layer at all — proving it's a
+        # blend, not a straight overwrite of either extreme.
+        self.assertNotEqual(faded_pixels, list(img_opaque.getdata()))
+        self.assertNotEqual(faded_pixels, list(img_none.getdata()))
+
+    def test_sub_partial_opacity_blends_decorative_lines(self):
+        opaque = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55,
+             "size": 0.050, "opacity": 1.0},
+        ]
+        faded = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55,
+             "size": 0.050, "opacity": 0.5},
+        ]
+        no_sub = [{"type": "photo", "src": str(self.photo_path)}]
+        img_opaque, _ = compose(opaque, (400, 500), self.font_manager)
+        img_faded, _ = compose(faded, (400, 500), self.font_manager)
+        img_none, _ = compose(no_sub, (400, 500), self.font_manager)
+        faded_pixels = list(img_faded.getdata())
+        self.assertNotEqual(faded_pixels, list(img_opaque.getdata()))
+        self.assertNotEqual(faded_pixels, list(img_none.getdata()))
+
 
 class TestGetBackground(unittest.TestCase):
     def setUp(self):

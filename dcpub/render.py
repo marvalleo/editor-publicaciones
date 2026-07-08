@@ -210,10 +210,14 @@ def compose(layers, canvas_size, font_manager):
                 line_len = int(W * 0.11)
                 gap = int(W * 0.03)
                 lx1 = max(0, sx - gap - line_len)
-                line_color = _apply_opacity(VERDE, opacity)
-                draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
                 rx2 = min(W, sx + sw + gap + line_len)
-                draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                line_color = _apply_opacity(VERDE, opacity)
+                deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                deco_draw = ImageDraw.Draw(deco_layer)
+                deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
+                deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                canvas = Image.alpha_composite(canvas, deco_layer)
+                draw = ImageDraw.Draw(canvas)
                 draw.text((sx + 2, sy + 2), subtitle, font=font_s,
                           fill=_apply_opacity((0, 0, 0, 130), opacity))
                 draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
@@ -221,7 +225,7 @@ def compose(layers, canvas_size, font_manager):
 
         elif kind == "desc":
             description = layer["text"]
-            if description.strip() and opacity > 0.0:
+            if description.strip():
                 bsz = max(8, int(W * layer["size"]))
                 font_b = font_manager.load("body", bsz)
                 box_w = int(W * 0.90)
@@ -255,11 +259,19 @@ def compose(layers, canvas_size, font_manager):
                 text_color = _apply_opacity(BLANCO + (255,), opacity)
                 if icon != "ninguno":
                     iy = by + (box_h - icon_sz) // 2
-                    draw_icon(draw, bx + pad, iy, icon_sz, icon, icon_color)
+                    icon_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    icon_draw = ImageDraw.Draw(icon_layer)
+                    draw_icon(icon_draw, bx + pad, iy, icon_sz, icon, icon_color)
+                    canvas = Image.alpha_composite(canvas, icon_layer)
+                    draw = ImageDraw.Draw(canvas)
 
                 dy = by + (box_h - text_h) // 2
+                text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                text_draw = ImageDraw.Draw(text_layer)
                 for i, l in enumerate(dlines):
-                    draw.text((text_x, dy + i * dlh), l, font=font_b, fill=text_color)
+                    text_draw.text((text_x, dy + i * dlh), l, font=font_b, fill=text_color)
+                canvas = Image.alpha_composite(canvas, text_layer)
+                draw = ImageDraw.Draw(canvas)
 
                 bboxes["desc"] = (bx, by, bx + box_w, by + box_h)
 
