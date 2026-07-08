@@ -57,25 +57,34 @@ def wrap_text(text, font, max_w, draw):
     return lines or [""]
 
 
-def _get_background(photo_path, size):
-    """Devuelve la foto escalada con el gradiente inferior aplicado (cacheado)."""
-    key = (str(photo_path), size)
+def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5):
+    """Recorta la foto tipo "cover" al tamaño exacto del lienzo (sin deformar),
+    aplicando zoom y posición de recorte, más el gradiente inferior. Cacheado."""
+    Wc, Hc = canvas_size
+    key = (str(photo_path), Wc, Hc, round(zoom, 4), round(offset_x, 4), round(offset_y, 4))
     if _bg_cache["key"] == key:
         return _bg_cache["img"].copy()
 
     photo = Image.open(photo_path).convert("RGBA")
-    W, H = photo.size
-    scale = size / max(W, H)
-    W2, H2 = max(1, int(W * scale)), max(1, int(H * scale))
-    photo = photo.resize((W2, H2), Image.LANCZOS)
-    W, H = W2, H2
+    Wp, Hp = photo.size
+    base_scale = max(Wc / Wp, Hc / Hp)
+    scale = base_scale * max(1.0, zoom)
+    Ws = max(Wc, round(Wp * scale))
+    Hs = max(Hc, round(Hp * scale))
+    photo = photo.resize((Ws, Hs), Image.LANCZOS)
 
-    grad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    excess_x = Ws - Wc
+    excess_y = Hs - Hc
+    crop_x = int(excess_x * min(1.0, max(0.0, offset_x)))
+    crop_y = int(excess_y * min(1.0, max(0.0, offset_y)))
+    photo = photo.crop((crop_x, crop_y, crop_x + Wc, crop_y + Hc))
+
+    grad = Image.new("RGBA", (Wc, Hc), (0, 0, 0, 0))
     gd = ImageDraw.Draw(grad)
-    start = int(H * 0.34)
-    for y in range(start, H):
-        a = int(150 * min(1.0, (y - start) / max(1, (H - start))))
-        gd.line([(0, y), (W, y)], fill=(0, 0, 0, a))
+    start = int(Hc * 0.34)
+    for y in range(start, Hc):
+        a = int(150 * min(1.0, (y - start) / max(1, (Hc - start))))
+        gd.line([(0, y), (Wc, y)], fill=(0, 0, 0, a))
     photo = Image.alpha_composite(photo, grad)
 
     _bg_cache["key"] = key
@@ -83,24 +92,27 @@ def _get_background(photo_path, size):
     return photo.copy()
 
 
-def compose(photo_path, layers, size, font_manager):
+def compose(layers, canvas_size, font_manager):
     """
     Compone la publicación a partir de una lista de capas.
 
-    layers : lista de dicts, cada uno con clave "type" ("logo"|"title"|"sub"|"desc")
-             y sus campos:
+    layers : lista de dicts, cada uno con clave "type":
+             - photo : src, zoom (≥1.0, default 1.0), offset_x, offset_y (fracciones
+                       0..1, default 0.5) — capa de fondo, se recorta tipo "cover"
+                       sin deformar y siempre cubre todo el lienzo.
              - logo  : x,y (esquina sup-izq, frac), size (diámetro, frac. ancho)
              - title : text, x,y (esquina sup-izq, frac), size (alto de fuente, frac. ancho)
              - sub   : text, x (centro horizontal, frac), y (tope, frac), size (fuente, frac)
              - desc  : text, icon, x,y (esquina sup-izq del recuadro, frac), size (fuente, frac)
-    size   : lado mayor de la imagen renderizada (px).
+    canvas_size : (ancho, alto) en px del lienzo final.
     font_manager : instancia de FontManager para cargar las fuentes por rol.
 
     Devuelve (imagen RGBA, bboxes) donde bboxes[type] = (x0,y0,x1,y1) en px.
-    Las capas con texto vacío/blanco no producen bbox (igual que v2.0).
+    Las capas con texto vacío/blanco no producen bbox. Si no hay capa "photo",
+    el lienzo queda transparente (del tamaño pedido) en vez de fallar.
     """
-    canvas = _get_background(photo_path, size)
-    W, H = canvas.size
+    W, H = canvas_size
+    canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(canvas)
     bboxes = {}
 
@@ -109,7 +121,17 @@ def compose(photo_path, layers, size, font_manager):
     for layer in layers:
         kind = layer["type"]
 
-        if kind == "logo":
+        if kind == "photo":
+            canvas = _get_background(
+                layer["src"], (W, H),
+                zoom=layer.get("zoom", 1.0),
+                offset_x=layer.get("offset_x", 0.5),
+                offset_y=layer.get("offset_y", 0.5),
+            )
+            draw = ImageDraw.Draw(canvas)
+            bboxes["photo"] = (0, 0, W, H)
+
+        elif kind == "logo":
             if not LOGO_FILE.exists():
                 continue
             lsz = max(20, int(W * layer["size"]))
