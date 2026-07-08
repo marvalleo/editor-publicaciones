@@ -35,6 +35,42 @@ HANDLE_SIZE = 5  # medio-lado del cuadradito de cada handle, en px de pantalla
 NUDGE_STEP = 0.004        # paso normal (fracción del lienzo)
 NUDGE_STEP_SHIFT = 0.02   # paso grande (Shift)
 NUDGE_STEP_ALT = 0.001    # paso fino (Alt)
+SNAP_THRESHOLD = 8    # px de pantalla
+MARGIN_FRAC = 0.055   # margen del lienzo, misma fracción que usa render.py para el título
+
+
+def _snap_position(new_x0, new_y0, bw, bh, iw, ih):
+    """Ajusta (new_x0,new_y0) si el centro o los bordes de la caja arrastrada
+    (ancho bw, alto bh) quedan cerca del centro o los márgenes del lienzo
+    (iw x ih). Devuelve (new_x0, new_y0, guias), donde guias es una lista
+    de ("v"|"h", posición_en_px) a dibujar como líneas guía."""
+    guides = []
+    margin_x = MARGIN_FRAC * iw
+    margin_y = MARGIN_FRAC * ih
+    cx, cy = new_x0 + bw / 2, new_y0 + bh / 2
+
+    if abs(cx - iw / 2) <= SNAP_THRESHOLD:
+        new_x0 = iw / 2 - bw / 2
+        guides.append(("v", iw / 2))
+    if abs(cy - ih / 2) <= SNAP_THRESHOLD:
+        new_y0 = ih / 2 - bh / 2
+        guides.append(("h", ih / 2))
+
+    if abs(new_x0 - margin_x) <= SNAP_THRESHOLD:
+        new_x0 = margin_x
+        guides.append(("v", margin_x))
+    elif abs((new_x0 + bw) - (iw - margin_x)) <= SNAP_THRESHOLD:
+        new_x0 = iw - margin_x - bw
+        guides.append(("v", iw - margin_x))
+
+    if abs(new_y0 - margin_y) <= SNAP_THRESHOLD:
+        new_y0 = margin_y
+        guides.append(("h", margin_y))
+    elif abs((new_y0 + bh) - (ih - margin_y)) <= SNAP_THRESHOLD:
+        new_y0 = ih - margin_y - bh
+        guides.append(("h", ih - margin_y))
+
+    return new_x0, new_y0, guides
 
 
 class App(tk.Tk):
@@ -75,6 +111,7 @@ class App(tk.Tk):
         self._selected = None        # Layer seleccionada actualmente, o None
         self._handles = {}           # {nombre_handle: (x,y) en px de pantalla}
         self._resize = None          # estado del arrastre de resize en curso, o None
+        self._guides = []            # líneas guía activas durante un arrastre, [(tipo,pos_px), ...]
 
         self._build_ui()
 
@@ -355,6 +392,17 @@ class App(tk.Tk):
                 fill=ACCENT, outline=DARK)
             self._handles[name] = (hx, hy)
 
+    def _draw_guides(self):
+        ox, oy = self._img_origin
+        iw, ih = self._img_wh
+        for kind, pos in self._guides:
+            if kind == "v":
+                x = pos + ox
+                self.canvas.create_line(x, oy, x, oy + ih, fill=ACCENT, dash=(3, 3))
+            else:
+                y = pos + oy
+                self.canvas.create_line(ox, y, ox + iw, y, fill=ACCENT, dash=(3, 3))
+
     # ── Resize con handles ──────────────────────────────────────
     def _handle_at(self, cx, cy):
         """Devuelve el nombre del handle bajo el punto de pantalla (cx,cy), o None."""
@@ -512,6 +560,7 @@ class App(tk.Tk):
             self._img_origin = (x0, y0)
             self.canvas.create_image(x0, y0, anchor="nw", image=self._preview_imgtk)
             self._draw_selection_overlay()
+            self._draw_guides()
             self._update_readout()
             self.v_status.set("Vista previa lista.")
         except Exception as e:
@@ -523,6 +572,7 @@ class App(tk.Tk):
         return ex - ox, ey - oy
 
     def _on_press(self, event):
+        self._guides = []
         if self._selected is not None:
             handle = self._handle_at(event.x, event.y)
             if handle is not None:
@@ -557,10 +607,14 @@ class App(tk.Tk):
         new_x0 = ix - self._drag_off[0]
         new_y0 = iy - self._drag_off[1]
 
+        bb = self._last_bboxes.get(elem)
+        bw = (bb[2] - bb[0]) if bb else 0
+        bh = (bb[3] - bb[1]) if bb else 0
+        new_x0, new_y0, self._guides = _snap_position(new_x0, new_y0, bw, bh, iw, ih)
+
         layer = self._layer_by_kind(elem)
         if elem == "sub":
-            bb = self._last_bboxes.get("sub")
-            half_w = (bb[2] - bb[0]) / 2 if bb else 0
+            half_w = bw / 2
             cx = new_x0 + half_w
             layer.x = min(1.0, max(0.0, cx / iw))
             layer.y = min(1.0, max(0.0, new_y0 / ih))
@@ -574,6 +628,8 @@ class App(tk.Tk):
     def _on_release(self, event):
         self._drag_elem = None
         self._resize = None
+        self._guides = []
+        self._render_now()
 
     # ── Generar en alta resolución ─────────────────────────────
     def _generate(self):
