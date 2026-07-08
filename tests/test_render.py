@@ -164,6 +164,63 @@ class TestCompose(unittest.TestCase):
         self.assertNotEqual(faded_pixels, list(img_opaque.getdata()))
         self.assertNotEqual(faded_pixels, list(img_none.getdata()))
 
+    def test_title_partial_opacity_blends_text_instead_of_overwriting(self):
+        opaque = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Hola", "x": 0.055, "y": 0.42, "size": 0.15, "opacity": 1.0},
+        ]
+        faded = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Hola", "x": 0.055, "y": 0.42, "size": 0.15, "opacity": 0.5},
+        ]
+        no_title = [{"type": "photo", "src": str(self.photo_path)}]
+        img_opaque, _ = compose(opaque, (400, 500), self.font_manager)
+        img_faded, _ = compose(faded, (400, 500), self.font_manager)
+        img_none, _ = compose(no_title, (400, 500), self.font_manager)
+        faded_pixels = list(img_faded.getdata())
+        self.assertNotEqual(faded_pixels, list(img_opaque.getdata()))
+        self.assertNotEqual(faded_pixels, list(img_none.getdata()))
+
+    def test_sub_partial_opacity_blends_text_instead_of_overwriting(self):
+        opaque = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55,
+             "size": 0.050, "opacity": 1.0},
+        ]
+        faded = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55,
+             "size": 0.050, "opacity": 0.5},
+        ]
+        no_sub = [{"type": "photo", "src": str(self.photo_path)}]
+        img_opaque, _ = compose(opaque, (400, 500), self.font_manager)
+        img_faded, _ = compose(faded, (400, 500), self.font_manager)
+        img_none, _ = compose(no_sub, (400, 500), self.font_manager)
+        faded_pixels = list(img_faded.getdata())
+        self.assertNotEqual(faded_pixels, list(img_opaque.getdata()))
+        self.assertNotEqual(faded_pixels, list(img_none.getdata()))
+
+    def test_title_opacity_zero_makes_text_invisible(self):
+        layers_with = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Hola", "x": 0.055, "y": 0.42, "size": 0.15, "opacity": 0.0},
+        ]
+        layers_without = [{"type": "photo", "src": str(self.photo_path)}]
+        img_with, _ = compose(layers_with, (400, 500), self.font_manager)
+        img_without, _ = compose(layers_without, (400, 500), self.font_manager)
+        self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
+
+    def test_sub_opacity_zero_makes_text_and_lines_invisible(self):
+        layers_with = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55,
+             "size": 0.050, "opacity": 0.0},
+        ]
+        layers_without = [{"type": "photo", "src": str(self.photo_path)}]
+        img_with, _ = compose(layers_with, (400, 500), self.font_manager)
+        img_without, _ = compose(layers_without, (400, 500), self.font_manager)
+        self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
+
 
 class TestGetBackground(unittest.TestCase):
     def setUp(self):
