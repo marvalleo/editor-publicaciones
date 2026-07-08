@@ -278,56 +278,182 @@ class App(tk.Tk):
         scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        tk.Label(inner, text="POSICIÓN Y TAMAÑO", bg=PANEL2, fg=ACCENT,
+        tk.Label(inner, text="PROPIEDADES", bg=PANEL2, fg=ACCENT,
                  font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(16, 6))
-        tk.Label(inner, text="Cada elemento por separado. También puedes\narrastrarlos en la vista previa.",
+        tk.Label(inner, text="Hacé click en un elemento de la vista previa\npara editarlo acá.",
                  bg=PANEL2, fg=MUTED, font=("Segoe UI", 8), justify="left").pack(
             anchor="w", padx=16, pady=(0, 8))
 
-        self._build_photo_controls(inner)
-
-        for elem in ELEMENTS:
-            self._build_control_group(inner, elem)
+        self._props_body = tk.Frame(inner, bg=PANEL2)
+        self._props_body.pack(fill=tk.X)
 
         tk.Button(inner, text="↺  Restablecer posiciones", bg="#3d3d3d", fg=TEXT,
                   relief="flat", font=("Segoe UI", 9), pady=6,
                   command=self._reset).pack(fill=tk.X, padx=16, pady=(12, 16))
 
-    def _build_photo_controls(self, parent):
-        card = tk.Frame(parent, bg=PANEL, padx=12, pady=8)
+        self._build_property_panel()
+
+    def _build_property_panel(self):
+        """Reconstruye el contenido del panel derecho según la capa seleccionada."""
+        for w in self._props_body.winfo_children():
+            w.destroy()
+        self.ctrl = {}
+
+        if self._selected is None:
+            tk.Label(self._props_body, text="Seleccioná una capa en la vista previa.",
+                     bg=PANEL2, fg=MUTED, font=("Segoe UI", 9), wraplength=250,
+                     justify="left").pack(anchor="w", padx=16, pady=8)
+            return
+
+        layer = self._selected
+        kind = self._kind_of(layer)
+        if kind is None:
+            return
+
+        card = tk.Frame(self._props_body, bg=PANEL, padx=12, pady=8)
         card.pack(fill=tk.X, padx=12, pady=5)
 
-        tk.Label(card, text="Foto", bg=PANEL, fg=ACCENT,
+        label = "Foto" if kind == "photo" else LABELS[kind]
+        tk.Label(card, text=label, bg=PANEL, fg=ACCENT,
                  font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
-        self.ctrl["photo"] = {}
-        self._slider(card, "photo", "zoom", "Zoom", 1.0, 3.0)
-        self._slider(card, "photo", "offset_x", "Posición X del recorte", 0.0, 1.0)
-        self._slider(card, "photo", "offset_y", "Posición Y del recorte", 0.0, 1.0)
+        header = tk.Frame(card, bg=PANEL)
+        header.pack(fill=tk.X, pady=(4, 6))
+        visible_text = "🙈  Ocultar" if layer.visible else "👁  Mostrar"
+        tk.Button(header, text=visible_text, bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._toggle_visible).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 3))
+        locked_text = "🔓  Desbloquear" if layer.locked else "🔒  Bloquear"
+        tk.Button(header, text=locked_text, bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._toggle_locked).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(3, 0))
 
-    def _build_control_group(self, parent, elem):
-        card = tk.Frame(parent, bg=PANEL, padx=12, pady=8)
-        card.pack(fill=tk.X, padx=12, pady=5)
+        self.ctrl[kind] = {}
+        disabled = layer.locked
 
-        tk.Label(card, text=LABELS[elem], bg=PANEL, fg=ACCENT,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        if kind == "photo":
+            self._slider(card, kind, "zoom", "Zoom", 1.0, 3.0, disabled=disabled)
+            self._slider(card, kind, "offset_x", "Posición X del recorte", 0.0, 1.0,
+                         disabled=disabled)
+            self._slider(card, kind, "offset_y", "Posición Y del recorte", 0.0, 1.0,
+                         disabled=disabled)
+            self._slider(card, kind, "opacity", "Opacidad", 0.0, 1.0,
+                         disabled=disabled, as_percent=True)
+            return
 
-        self.ctrl[elem] = {}
-        smin, smax = SIZE_RANGE[elem]
-        size_label = "Tamaño del logo" if elem == "logo" else "Tamaño de fuente"
-        self._slider(card, elem, "size", size_label, smin, smax)
-        self._slider(card, elem, "x", "Posición X", 0.0, 1.0)
-        self._slider(card, elem, "y", "Posición Y", 0.0, 1.0)
+        smin, smax = SIZE_RANGE[kind]
+        size_label = "Tamaño del logo" if kind == "logo" else "Tamaño de fuente"
+        self._slider(card, kind, "x", "Posición X", 0.0, 1.0, disabled=disabled)
+        self._slider(card, kind, "y", "Posición Y", 0.0, 1.0, disabled=disabled)
+        self._slider(card, kind, "size", size_label, smin, smax, disabled=disabled)
+        self._slider(card, kind, "opacity", "Opacidad", 0.0, 1.0,
+                     disabled=disabled, as_percent=True)
 
-    def _slider(self, parent, elem, param, label, lo, hi):
-        var = tk.DoubleVar(value=self._get_layer_value(elem, param))
+        align_row = tk.Frame(card, bg=PANEL)
+        align_row.pack(fill=tk.X, pady=(8, 0))
+        btn_state = tk.DISABLED if disabled else tk.NORMAL
+        tk.Button(align_row, text="↔ Centrar H", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), state=btn_state,
+                  command=lambda: self._center_selected("x")).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        tk.Button(align_row, text="↕ Centrar V", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), state=btn_state,
+                  command=lambda: self._center_selected("y")).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        tk.Button(align_row, text="+ Centrar", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), state=btn_state,
+                  command=lambda: self._center_selected("both")).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+
+    def _format_value(self, value, as_percent):
+        if as_percent:
+            return f"{round(value * 100)}"
+        return f"{value:.3f}"
+
+    def _slider(self, parent, elem, param, label, lo, hi, disabled=False, as_percent=False):
+        value = self._get_layer_value(elem, param)
+        var = tk.DoubleVar(value=value)
         self.ctrl[elem][param] = var
+
         tk.Label(parent, text=label, bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 8)).pack(anchor="w", pady=(4, 0))
-        s = ttk.Scale(parent, from_=lo, to=hi, variable=var, orient=tk.HORIZONTAL,
-                      style="Brand.Horizontal.TScale",
-                      command=lambda _v, e=elem, p=param: self._on_slider(e, p))
-        s.pack(fill=tk.X)
+
+        row = tk.Frame(parent, bg=PANEL)
+        row.pack(fill=tk.X)
+
+        state = tk.DISABLED if disabled else tk.NORMAL
+        s = ttk.Scale(row, from_=lo, to=hi, variable=var, orient=tk.HORIZONTAL,
+                      style="Brand.Horizontal.TScale", state=state,
+                      command=lambda _v, e=elem, p=param, ap=as_percent: self._on_slider(e, p, ap))
+        s.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        entry_var = tk.StringVar(value=self._format_value(value, as_percent))
+        entry = tk.Entry(row, textvariable=entry_var, width=6, bg=FIELD, fg=TEXT,
+                          insertbackground=TEXT, relief="flat", bd=2,
+                          font=("Segoe UI", 8), state=state)
+        entry.pack(side=tk.LEFT, padx=(6, 0))
+        entry.bind("<Return>",
+                   lambda e, elem=elem, param=param, lo=lo, hi=hi, ap=as_percent,
+                   var=var, ev=entry_var: self._on_entry_commit(elem, param, lo, hi, ap, var, ev))
+        entry.bind("<FocusOut>",
+                   lambda e, elem=elem, param=param, lo=lo, hi=hi, ap=as_percent,
+                   var=var, ev=entry_var: self._on_entry_commit(elem, param, lo, hi, ap, var, ev))
+        self.ctrl[elem][param + "_entry"] = entry_var
+
+    def _on_entry_commit(self, elem, param, lo, hi, as_percent, var, entry_var):
+        raw = entry_var.get().strip().replace(",", ".")
+        try:
+            num = float(raw)
+        except ValueError:
+            entry_var.set(self._format_value(var.get(), as_percent))
+            return
+        value = num / 100 if as_percent else num
+        value = min(hi, max(lo, value))
+        var.set(value)
+        entry_var.set(self._format_value(value, as_percent))
+        self._set_layer_value(elem, param, value)
+        self._schedule_render()
+
+    def _toggle_visible(self):
+        if self._selected is None:
+            return
+        self._selected.visible = not self._selected.visible
+        self._build_property_panel()
+        self._schedule_render()
+
+    def _toggle_locked(self):
+        if self._selected is None:
+            return
+        self._selected.locked = not self._selected.locked
+        self._build_property_panel()
+        self._schedule_render()
+
+    def _center_selected(self, axis):
+        if self._selected is None or self._selected.locked:
+            return
+        kind = self._kind_of(self._selected)
+        bb = self._last_bboxes.get(kind)
+        if not bb:
+            return
+        iw, ih = self._img_wh
+        if iw == 0 or ih == 0:
+            return
+        x0, y0, x1, y1 = bb
+        bw, bh = x1 - x0, y1 - y0
+        new_x0, new_y0 = _center_position(axis, x0, y0, bw, bh, iw, ih)
+
+        layer = self._selected
+        if kind == "sub":
+            half_w = bw / 2
+            cx = new_x0 + half_w
+            layer.x = min(1.0, max(0.0, cx / iw))
+            layer.y = min(1.0, max(0.0, new_y0 / ih))
+        else:
+            layer.x = min(1.0, max(0.0, new_x0 / iw))
+            layer.y = min(1.0, max(0.0, new_y0 / ih))
+
+        self._sync_sliders()
+        self._render_now()
 
     # ── Puente entre el vocabulario del render y el modelo ─────
     def _layer_by_kind(self, kind):
@@ -368,32 +494,45 @@ class App(tk.Tk):
             setattr(layer, param, value)
 
     # ── Sincronización slider  →  estado ───────────────────────
-    def _on_slider(self, elem, param):
+    def _on_slider(self, elem, param, as_percent=False):
         if self._updating:
             return
-        self._set_layer_value(elem, param, float(self.ctrl[elem][param].get()))
+        value = float(self.ctrl[elem][param].get())
+        self._set_layer_value(elem, param, value)
+        entry_var = self.ctrl[elem].get(param + "_entry")
+        if entry_var is not None:
+            entry_var.set(self._format_value(value, as_percent))
         self._schedule_render()
 
     def _sync_sliders(self):
-        """Refleja el estado actual en los sliders sin disparar render."""
+        """Refleja el estado actual en los controles del panel activo, sin disparar render."""
+        if self._selected is None:
+            return
+        kind = self._kind_of(self._selected)
+        if kind is None or kind not in self.ctrl:
+            return
         self._updating = True
-        for elem in ELEMENTS:
-            for param in ("size", "x", "y"):
-                self.ctrl[elem][param].set(self._get_layer_value(elem, param))
-        for param in ("zoom", "offset_x", "offset_y"):
-            self.ctrl["photo"][param].set(self._get_layer_value("photo", param))
+        for param, var in list(self.ctrl[kind].items()):
+            if param.endswith("_entry"):
+                continue
+            value = self._get_layer_value(kind, param)
+            var.set(value)
+            entry_var = self.ctrl[kind].get(param + "_entry")
+            if entry_var is not None:
+                entry_var.set(self._format_value(value, param == "opacity"))
         self._updating = False
 
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]
         self._selected = None
-        self._sync_sliders()
+        self._build_property_panel()
         self._schedule_render()
 
     # ── Selección ──────────────────────────────────────────────
     def _set_selected(self, layer):
         self._selected = layer
+        self._build_property_panel()
         self._render_now()
 
     def _update_readout(self):
