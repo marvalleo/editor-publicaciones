@@ -79,7 +79,7 @@ class App(tk.Tk):
         self.title("Generador de Publicaciones — Cabañas Don Cristobal")
         self.configure(bg=DARK)
         self.geometry("1360x820")
-        self.minsize(1100, 700)
+        self.minsize(1000, 600)
 
         self.font_manager = FontManager()
 
@@ -240,18 +240,46 @@ class App(tk.Tk):
             anchor="w", pady=(6, 12), **pad)
 
     def _build_right(self, right):
-        tk.Label(right, text="POSICIÓN Y TAMAÑO", bg=PANEL2, fg=ACCENT,
+        # Contenedor con scroll vertical: en pantallas chicas (notebooks) el
+        # panel completo no entra en la altura de la ventana.
+        scroll_canvas = tk.Canvas(right, bg=PANEL2, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(right, orient="vertical", command=scroll_canvas.yview)
+        inner = tk.Frame(scroll_canvas, bg=PANEL2)
+
+        inner_window = scroll_canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>",
+                   lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all")))
+        scroll_canvas.bind("<Configure>",
+                            lambda e: scroll_canvas.itemconfig(inner_window, width=e.width))
+        scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_mousewheel(event):
+            scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_wheel(_e):
+            scroll_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_wheel(_e):
+            scroll_canvas.unbind_all("<MouseWheel>")
+
+        scroll_canvas.bind("<Enter>", _bind_wheel)
+        scroll_canvas.bind("<Leave>", _unbind_wheel)
+
+        scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        tk.Label(inner, text="POSICIÓN Y TAMAÑO", bg=PANEL2, fg=ACCENT,
                  font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(16, 6))
-        tk.Label(right, text="Cada elemento por separado. También puedes\narrastrarlos en la vista previa.",
+        tk.Label(inner, text="Cada elemento por separado. También puedes\narrastrarlos en la vista previa.",
                  bg=PANEL2, fg=MUTED, font=("Segoe UI", 8), justify="left").pack(
             anchor="w", padx=16, pady=(0, 8))
 
-        self._build_photo_controls(right)
+        self._build_photo_controls(inner)
 
         for elem in ELEMENTS:
-            self._build_control_group(right, elem)
+            self._build_control_group(inner, elem)
 
-        tk.Button(right, text="↺  Restablecer posiciones", bg="#3d3d3d", fg=TEXT,
+        tk.Button(inner, text="↺  Restablecer posiciones", bg="#3d3d3d", fg=TEXT,
                   relief="flat", font=("Segoe UI", 9), pady=6,
                   command=self._reset).pack(fill=tk.X, padx=16, pady=(12, 16))
 
