@@ -563,19 +563,22 @@ class App(tk.Tk):
             if layer.type == "photo":
                 layers.append({"type": "photo", "src": self.v_photo.get().strip(),
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
-                                "offset_y": layer.offset_y})
+                                "offset_y": layer.offset_y, "opacity": layer.opacity})
             elif layer.type == "logo":
-                layers.append({"type": "logo", "x": layer.x, "y": layer.y, "size": layer.w})
+                layers.append({"type": "logo", "x": layer.x, "y": layer.y, "size": layer.w,
+                                "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "title":
                 layers.append({"type": "title", "text": self.txt_title.get("1.0", "end-1c"),
-                                "x": layer.x, "y": layer.y, "size": layer.size})
+                                "x": layer.x, "y": layer.y, "size": layer.size,
+                                "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "subtitle":
                 layers.append({"type": "sub", "text": self.v_sub.get(),
-                                "x": layer.x, "y": layer.y, "size": layer.size})
+                                "x": layer.x, "y": layer.y, "size": layer.size,
+                                "opacity": layer.opacity})
             elif layer.type == "box":
                 layers.append({"type": "desc", "text": self.txt_desc.get("1.0", "end-1c"),
                                 "icon": self.v_icon.get(), "x": layer.x, "y": layer.y,
-                                "size": layer.size})
+                                "size": layer.size, "opacity": layer.opacity})
         return layers
 
     # ── Render con debounce ────────────────────────────────────
