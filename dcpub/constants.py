@@ -37,3 +37,9 @@ SYSTEM_FONT_DIRS = [
 ICONS = ["planta", "montaña", "corazón", "cabaña", "ninguno"]
 
 ELEMENTS = ["logo", "title", "sub", "desc"]
+
+FORMATOS = [
+    {"name": "feed_4x5", "label": "1080×1350 (4:5)", "w": 1080, "h": 1350},
+    {"name": "feed_3x4", "label": "1080×1440 (3:4)", "w": 1080, "h": 1440},
+    {"name": "story_9x16", "label": "1080×1920 (9:16)", "w": 1080, "h": 1920},
+]
