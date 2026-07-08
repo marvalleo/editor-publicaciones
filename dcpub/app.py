@@ -70,7 +70,6 @@ class App(tk.Tk):
         self._drag_elem = None
         self._drag_off = (0, 0)
         self._last_bboxes = {}
-        self._canvas_img_id = None
         self._img_wh = (0, 0)        # tamaño en px de la imagen mostrada
 
         self._build_ui()
