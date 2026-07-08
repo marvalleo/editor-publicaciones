@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from dcpub.fonts import FontManager
-from dcpub.render import compose, wrap_text, _get_background
+from dcpub.render import compose, wrap_text, _get_background, _apply_opacity
 
 
 class TestCompose(unittest.TestCase):
@@ -98,6 +98,24 @@ class TestGetBackground(unittest.TestCase):
         left = _get_background(str(self.photo_path), (100, 300), zoom=1.5, offset_x=0.0, offset_y=0.5)
         right = _get_background(str(self.photo_path), (100, 300), zoom=1.5, offset_x=1.0, offset_y=0.5)
         self.assertNotEqual(list(left.getdata()), list(right.getdata()))
+
+
+class TestApplyOpacity(unittest.TestCase):
+    def test_scales_alpha_of_rgba_color(self):
+        self.assertEqual(_apply_opacity((10, 20, 30, 200), 0.5), (10, 20, 30, 100))
+
+    def test_full_opacity_keeps_alpha_unchanged(self):
+        self.assertEqual(_apply_opacity((10, 20, 30, 200), 1.0), (10, 20, 30, 200))
+
+    def test_rgb_input_assumes_full_alpha_before_scaling(self):
+        self.assertEqual(_apply_opacity((10, 20, 30), 0.5), (10, 20, 30, 128))
+
+    def test_zero_opacity_gives_zero_alpha(self):
+        self.assertEqual(_apply_opacity((10, 20, 30, 255), 0.0), (10, 20, 30, 0))
+
+    def test_opacity_is_clamped_to_valid_range(self):
+        self.assertEqual(_apply_opacity((10, 20, 30, 200), 5.0), (10, 20, 30, 200))
+        self.assertEqual(_apply_opacity((10, 20, 30, 200), -1.0), (10, 20, 30, 0))
 
 
 if __name__ == "__main__":

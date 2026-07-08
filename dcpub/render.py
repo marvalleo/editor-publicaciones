@@ -57,6 +57,19 @@ def wrap_text(text, font, max_w, draw):
     return lines or [""]
 
 
+def _apply_opacity(rgba_color, opacity):
+    """Multiplica el canal alfa de un color RGB/RGBA por `opacity` (0.0-1.0,
+    se recorta a ese rango). Si el color viene sin canal alfa, se asume 255."""
+    if len(rgba_color) == 3:
+        r, g, b = rgba_color
+        a = 255
+    else:
+        r, g, b, a = rgba_color
+    opacity = max(0.0, min(1.0, opacity))
+    a = max(0, min(255, round(a * opacity)))
+    return (r, g, b, a)
+
+
 def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5):
     """Recorta la foto tipo "cover" al tamaño exacto del lienzo (sin deformar),
     aplicando zoom y posición de recorte, más el gradiente inferior. Cacheado."""
