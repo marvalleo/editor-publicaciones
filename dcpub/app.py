@@ -348,7 +348,7 @@ class App(tk.Tk):
 
     def _kind_of(self, layer):
         """Inverso de _layer_by_kind: dado un Layer, devuelve su "kind" de render."""
-        for kind in ELEMENTS:
+        for kind in ["photo"] + ELEMENTS:
             if self._layer_by_kind(kind) is layer:
                 return kind
         return None
@@ -630,7 +630,14 @@ class App(tk.Tk):
                 self._drag_off = (ix - bb[0], iy - bb[1])
                 self._set_selected(layer)
                 return
+
         self._drag_elem = None
+        photo_layer = self._layer_by_kind("photo")
+        bb_photo = self._last_bboxes.get("photo")
+        if (photo_layer is not None and not photo_layer.locked and bb_photo
+                and bb_photo[0] <= ix <= bb_photo[2] and bb_photo[1] <= iy <= bb_photo[3]):
+            self._set_selected(photo_layer)
+            return
         self._set_selected(None)
 
     def _on_drag(self, event):
