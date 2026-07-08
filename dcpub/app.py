@@ -54,6 +54,7 @@ class App(tk.Tk):
         self.v_icon  = tk.StringVar(value="planta")
         self.v_format = tk.StringVar(value=self._format_label_for(self.slide.format))
         self.v_status = tk.StringVar(value="Listo.")
+        self.v_readout = tk.StringVar(value="")
 
         # Variables de sliders {elem: {"size":var,"x":var,"y":var}} (y "photo": zoom/offset_x/offset_y)
         self.ctrl = {}
@@ -66,6 +67,7 @@ class App(tk.Tk):
         self._drag_off = (0, 0)
         self._last_bboxes = {}
         self._img_wh = (0, 0)        # tamaño en px de la imagen mostrada
+        self._selected = None        # Layer seleccionada actualmente, o None
 
         self._build_ui()
 
@@ -104,6 +106,8 @@ class App(tk.Tk):
 
         tk.Label(center, text="Vista previa · arrastra los elementos con el mouse",
                  bg=DARK, fg=MUTED, font=("Segoe UI", 10)).pack(anchor="n", pady=(8, 4))
+        tk.Label(center, textvariable=self.v_readout, bg=DARK, fg=ACCENT,
+                 font=("Segoe UI", 9)).pack(anchor="n", pady=(0, 4))
 
         self.canvas = tk.Canvas(center, bg="#141414", highlightthickness=0, cursor="fleur")
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
@@ -255,6 +259,13 @@ class App(tk.Tk):
                 return layer
         return None
 
+    def _kind_of(self, layer):
+        """Inverso de _layer_by_kind: dado un Layer, devuelve su "kind" de render."""
+        for kind in ELEMENTS:
+            if self._layer_by_kind(kind) is layer:
+                return kind
+        return None
+
     def _get_layer_value(self, elem, param):
         layer = self._layer_by_kind(elem)
         if elem == "logo" and param == "size":
@@ -289,8 +300,35 @@ class App(tk.Tk):
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]
+        self._selected = None
         self._sync_sliders()
         self._schedule_render()
+
+    # ── Selección ──────────────────────────────────────────────
+    def _set_selected(self, layer):
+        self._selected = layer
+        self._render_now()
+
+    def _update_readout(self):
+        if self._selected is None:
+            self.v_readout.set("")
+            return
+        layer = self._selected
+        kind = self._kind_of(layer)
+        tam = layer.w if kind == "logo" else layer.size
+        self.v_readout.set(
+            f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  Tamaño: {tam:.3f}")
+
+    def _draw_selection_overlay(self):
+        if self._selected is None:
+            return
+        kind = self._kind_of(self._selected)
+        bb = self._last_bboxes.get(kind)
+        if not bb:
+            return
+        ox, oy = self._img_origin
+        x0, y0, x1, y1 = bb[0] + ox, bb[1] + oy, bb[2] + ox, bb[3] + oy
+        self.canvas.create_rectangle(x0, y0, x1, y1, outline=ACCENT, width=2, dash=(4, 2))
 
     # ── Formato ────────────────────────────────────────────────
     def _format_label_for(self, fmt):
@@ -403,6 +441,8 @@ class App(tk.Tk):
             y0 = (ch - img.size[1]) // 2
             self._img_origin = (x0, y0)
             self.canvas.create_image(x0, y0, anchor="nw", image=self._preview_imgtk)
+            self._draw_selection_overlay()
+            self._update_readout()
             self.v_status.set("Vista previa lista.")
         except Exception as e:
             self.v_status.set(f"Error: {e}")
@@ -415,11 +455,17 @@ class App(tk.Tk):
     def _on_press(self, event):
         ix, iy = self._canvas_to_img(event.x, event.y)
         for elem in reversed(ELEMENTS):
+            layer = self._layer_by_kind(elem)
+            if layer is None or layer.locked:
+                continue
             bb = self._last_bboxes.get(elem)
             if bb and bb[0] <= ix <= bb[2] and bb[1] <= iy <= bb[3]:
                 self._drag_elem = elem
                 self._drag_off = (ix - bb[0], iy - bb[1])
+                self._set_selected(layer)
                 return
+        self._drag_elem = None
+        self._set_selected(None)
 
     def _on_drag(self, event):
         if not self._drag_elem:
