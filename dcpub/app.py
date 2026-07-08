@@ -32,6 +32,9 @@ SIZE_RANGE = {
 LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción"}
 
 HANDLE_SIZE = 5  # medio-lado del cuadradito de cada handle, en px de pantalla
+NUDGE_STEP = 0.004        # paso normal (fracción del lienzo)
+NUDGE_STEP_SHIFT = 0.02   # paso grande (Shift)
+NUDGE_STEP_ALT = 0.001    # paso fino (Alt)
 
 
 class App(tk.Tk):
@@ -123,6 +126,11 @@ class App(tk.Tk):
         self._hint_id = self.canvas.create_text(
             10, 10, anchor="nw", fill="#666", font=("Segoe UI", 12),
             text="Elige una foto en el panel izquierdo\ny presiona «Vista previa».")
+
+        for key, dx, dy in [("Left", -1, 0), ("Right", 1, 0), ("Up", 0, -1), ("Down", 0, 1)]:
+            self.bind(f"<{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP))
+            self.bind(f"<Shift-{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP_SHIFT))
+            self.bind(f"<Alt-{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP_ALT))
 
     def _build_left(self, left):
         pad = {"padx": 16}
@@ -380,6 +388,15 @@ class App(tk.Tk):
         smin, smax = SIZE_RANGE[kind]
         new_value = min(smax, max(smin, self._resize["start_value"] * ratio))
         self._set_layer_value(kind, "size", new_value)
+        self._sync_sliders()
+        self._render_now()
+
+    def _nudge(self, dx_sign, dy_sign, step):
+        if self._selected is None:
+            return
+        layer = self._selected
+        layer.x = min(1.0, max(0.0, layer.x + dx_sign * step))
+        layer.y = min(1.0, max(0.0, layer.y + dy_sign * step))
         self._sync_sliders()
         self._render_now()
 
