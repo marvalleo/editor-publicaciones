@@ -109,7 +109,8 @@ def compose(layers, canvas_size, font_manager):
     """
     Compone la publicación a partir de una lista de capas.
 
-    layers : lista de dicts, cada uno con clave "type":
+    layers : lista de dicts, cada uno con clave "type" y una clave opcional
+             "opacity" (0.0-1.0, default 1.0) que se aplica a esa capa:
              - photo : src, zoom (≥1.0, default 1.0), offset_x, offset_y (fracciones
                        0..1, default 0.5) — capa de fondo, se recorta tipo "cover"
                        sin deformar y siempre cubre todo el lienzo.
@@ -133,14 +134,22 @@ def compose(layers, canvas_size, font_manager):
 
     for layer in layers:
         kind = layer["type"]
+        opacity = layer.get("opacity", 1.0)
 
         if kind == "photo":
-            canvas = _get_background(
+            bg = _get_background(
                 layer["src"], (W, H),
                 zoom=layer.get("zoom", 1.0),
                 offset_x=layer.get("offset_x", 0.5),
                 offset_y=layer.get("offset_y", 0.5),
             )
+            if opacity < 1.0:
+                r, g, b, a = bg.split()
+                a = a.point(lambda px, op=opacity: int(px * max(0.0, min(1.0, op))))
+                bg = Image.merge("RGBA", (r, g, b, a))
+                canvas = Image.alpha_composite(canvas, bg)
+            else:
+                canvas = bg
             draw = ImageDraw.Draw(canvas)
             bboxes["photo"] = (0, 0, W, H)
 
@@ -150,6 +159,10 @@ def compose(layers, canvas_size, font_manager):
             lsz = max(20, int(W * layer["size"]))
             try:
                 logo = Image.open(str(LOGO_FILE)).convert("RGBA").resize((lsz, lsz), Image.LANCZOS)
+                if opacity < 1.0:
+                    r, g, b, a = logo.split()
+                    a = a.point(lambda px, op=opacity: int(px * max(0.0, min(1.0, op))))
+                    logo = Image.merge("RGBA", (r, g, b, a))
                 lx = int(layer["x"] * W)
                 ly = int(layer["y"] * H)
                 canvas.alpha_composite(logo, (lx, ly))
@@ -172,10 +185,12 @@ def compose(layers, canvas_size, font_manager):
                         lines += wrap_text(part, font_t, max_w, draw)
                 lh = int(tsz * 1.22)
                 widest = 0
+                shadow_color = _apply_opacity((0, 0, 0, 160), opacity)
+                text_color = _apply_opacity(BLANCO + (255,), opacity)
                 for i, line in enumerate(lines):
                     yy = ty + i * lh
-                    draw.text((tx + 3, yy + 3), line, font=font_t, fill=(0, 0, 0, 160))
-                    draw.text((tx, yy), line, font=font_t, fill=BLANCO + (255,))
+                    draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
+                    draw.text((tx, yy), line, font=font_t, fill=text_color)
                     bb = draw.textbbox((tx, yy), line, font=font_t)
                     widest = max(widest, bb[2] - tx)
                 bboxes["title"] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
@@ -195,16 +210,18 @@ def compose(layers, canvas_size, font_manager):
                 line_len = int(W * 0.11)
                 gap = int(W * 0.03)
                 lx1 = max(0, sx - gap - line_len)
-                draw.line([(lx1, ly), (sx - gap, ly)], fill=VERDE, width=lw_deco)
+                line_color = _apply_opacity(VERDE, opacity)
+                draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
                 rx2 = min(W, sx + sw + gap + line_len)
-                draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=VERDE, width=lw_deco)
-                draw.text((sx + 2, sy + 2), subtitle, font=font_s, fill=(0, 0, 0, 130))
-                draw.text((sx, sy), subtitle, font=font_s, fill=VERDE)
+                draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                          fill=_apply_opacity((0, 0, 0, 130), opacity))
+                draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
                 bboxes["sub"] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
         elif kind == "desc":
             description = layer["text"]
-            if description.strip():
+            if description.strip() and opacity > 0.0:
                 bsz = max(8, int(W * layer["size"]))
                 font_b = font_manager.load("body", bsz)
                 box_w = int(W * 0.90)
@@ -228,18 +245,21 @@ def compose(layers, canvas_size, font_manager):
 
                 box_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
                 bd = ImageDraw.Draw(box_layer)
+                box_fill = _apply_opacity(BOX_COLOR, opacity)
                 bd.rounded_rectangle([(bx, by), (bx + box_w, by + box_h)],
-                                     radius=corner_r, fill=BOX_COLOR)
+                                     radius=corner_r, fill=box_fill)
                 canvas = Image.alpha_composite(canvas, box_layer)
                 draw = ImageDraw.Draw(canvas)
 
+                icon_color = _apply_opacity(VERDE, opacity)
+                text_color = _apply_opacity(BLANCO + (255,), opacity)
                 if icon != "ninguno":
                     iy = by + (box_h - icon_sz) // 2
-                    draw_icon(draw, bx + pad, iy, icon_sz, icon, VERDE)
+                    draw_icon(draw, bx + pad, iy, icon_sz, icon, icon_color)
 
                 dy = by + (box_h - text_h) // 2
                 for i, l in enumerate(dlines):
-                    draw.text((text_x, dy + i * dlh), l, font=font_b, fill=BLANCO + (255,))
+                    draw.text((text_x, dy + i * dlh), l, font=font_b, fill=text_color)
 
                 bboxes["desc"] = (bx, by, bx + box_w, by + box_h)
 
