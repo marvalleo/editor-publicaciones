@@ -1,4 +1,4 @@
-"""Interfaz gráfica: ventana principal del editor (portada de v2.0, con formatos y foto cover/zoom/offset)."""
+"""Interfaz gráfica: ventana principal del editor (conectada a Project/Slide/Layer)."""
 
 import threading
 from pathlib import Path
@@ -10,6 +10,7 @@ from PIL import Image, ImageTk
 
 from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS, FORMATOS
 from .fonts import FontManager
+from .models import crear_proyecto_por_defecto
 from .render import compose
 
 DARK = "#1e1e1e"
@@ -19,17 +20,6 @@ TEXT = "#e0e0e0"
 MUTED = "#9a9a9a"
 ACCENT = "#8DC26F"
 FIELD = "#333333"
-
-# Valores por defecto de cada elemento (fracciones)
-DEFAULTS = {
-    "logo":  {"x": 0.40,  "y": 0.022, "size": 0.20},
-    "title": {"x": 0.055, "y": 0.42,  "size": 0.087},
-    "sub":   {"x": 0.50,  "y": 0.55,  "size": 0.050},
-    "desc":  {"x": 0.05,  "y": 0.808, "size": 0.033},
-}
-
-# Valores por defecto de la foto (zoom mínimo = exactamente "cover", centrada)
-PHOTO_DEFAULTS = {"zoom": 1.0, "offset_x": 0.5, "offset_y": 0.5}
 
 # Rango de los sliders de tamaño por elemento (fracción del ancho)
 SIZE_RANGE = {
@@ -52,12 +42,9 @@ class App(tk.Tk):
 
         self.font_manager = FontManager()
 
-        # Estado de los elementos (copia de los defaults)
-        self.el = {k: dict(v) for k, v in DEFAULTS.items()}
-        self.el["photo"] = dict(PHOTO_DEFAULTS)
-
-        # Formato activo (empieza en el primero de la lista: 1080x1350 / 4:5)
-        self.format = dict(FORMATOS[0])
+        # Proyecto y lámina activos (modelo formal de dcpub.models)
+        self.project = crear_proyecto_por_defecto()
+        self.slide = self.project.slides[0]
 
         # Variables de texto
         self.v_photo = tk.StringVar()
@@ -65,7 +52,7 @@ class App(tk.Tk):
         self.v_sub   = tk.StringVar(value="frase secundaria")
         self.v_desc  = tk.StringVar()
         self.v_icon  = tk.StringVar(value="planta")
-        self.v_format = tk.StringVar(value=FORMATOS[0]["label"])
+        self.v_format = tk.StringVar(value=self._format_label_for(self.slide.format))
         self.v_status = tk.StringVar(value="Listo.")
 
         # Variables de sliders {elem: {"size":var,"x":var,"y":var}} (y "photo": zoom/offset_x/offset_y)
@@ -242,7 +229,7 @@ class App(tk.Tk):
         self._slider(card, elem, "y", "Posición Y", 0.0, 1.0)
 
     def _slider(self, parent, elem, param, label, lo, hi):
-        var = tk.DoubleVar(value=self.el[elem][param])
+        var = tk.DoubleVar(value=self._get_layer_value(elem, param))
         self.ctrl[elem][param] = var
         tk.Label(parent, text=label, bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 8)).pack(anchor="w", pady=(4, 0))
@@ -251,11 +238,42 @@ class App(tk.Tk):
                       command=lambda _v, e=elem, p=param: self._on_slider(e, p))
         s.pack(fill=tk.X)
 
+    # ── Puente entre el vocabulario del render y el modelo ─────
+    def _layer_by_kind(self, kind):
+        """Traduce entre el vocabulario del render ("photo"/"logo"/"title"/"sub"/"desc")
+        y los tipos/roles reales de dcpub.models (Layer.type, TextLayer.role)."""
+        for layer in self.slide.layers:
+            if kind == "photo" and layer.type == "photo":
+                return layer
+            if kind == "logo" and layer.type == "logo":
+                return layer
+            if kind == "title" and layer.type == "text" and layer.role == "title":
+                return layer
+            if kind == "sub" and layer.type == "text" and layer.role == "subtitle":
+                return layer
+            if kind == "desc" and layer.type == "box":
+                return layer
+        return None
+
+    def _get_layer_value(self, elem, param):
+        layer = self._layer_by_kind(elem)
+        if elem == "logo" and param == "size":
+            return layer.w
+        return getattr(layer, param)
+
+    def _set_layer_value(self, elem, param, value):
+        layer = self._layer_by_kind(elem)
+        if elem == "logo" and param == "size":
+            layer.w = value
+            layer.h = value
+        else:
+            setattr(layer, param, value)
+
     # ── Sincronización slider  →  estado ───────────────────────
     def _on_slider(self, elem, param):
         if self._updating:
             return
-        self.el[elem][param] = float(self.ctrl[elem][param].get())
+        self._set_layer_value(elem, param, float(self.ctrl[elem][param].get()))
         self._schedule_render()
 
     def _sync_sliders(self):
@@ -263,48 +281,54 @@ class App(tk.Tk):
         self._updating = True
         for elem in ELEMENTS:
             for param in ("size", "x", "y"):
-                self.ctrl[elem][param].set(self.el[elem][param])
+                self.ctrl[elem][param].set(self._get_layer_value(elem, param))
         for param in ("zoom", "offset_x", "offset_y"):
-            self.ctrl["photo"][param].set(self.el["photo"][param])
+            self.ctrl["photo"][param].set(self._get_layer_value("photo", param))
         self._updating = False
 
     def _reset(self):
-        self.el = {k: dict(v) for k, v in DEFAULTS.items()}
-        self.el["photo"] = dict(PHOTO_DEFAULTS)
+        self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
+        self.slide = self.project.slides[0]
         self._sync_sliders()
         self._schedule_render()
 
     # ── Formato ────────────────────────────────────────────────
+    def _format_label_for(self, fmt):
+        for f in FORMATOS:
+            if f["name"] == fmt.get("name"):
+                return f["label"]
+        return f"{fmt['w']}×{fmt['h']} (personalizado)"
+
     def _on_format_change(self):
         label = self.v_format.get()
         if label == "Personalizado…":
             w = simpledialog.askinteger("Formato personalizado", "Ancho (px):",
-                                         initialvalue=self.format["w"], minvalue=100,
+                                         initialvalue=self.slide.format["w"], minvalue=100,
                                          maxvalue=8000, parent=self)
             if not w:
                 self._sync_format_label()
                 return
             h = simpledialog.askinteger("Formato personalizado", "Alto (px):",
-                                         initialvalue=self.format["h"], minvalue=100,
+                                         initialvalue=self.slide.format["h"], minvalue=100,
                                          maxvalue=8000, parent=self)
             if not h:
                 self._sync_format_label()
                 return
-            self.format = {"name": "personalizado", "label": f"{w}×{h} (personalizado)",
-                            "w": w, "h": h}
-            self.v_format.set(self.format["label"])
+            self.slide.format = {"name": "personalizado", "w": w, "h": h}
+            self.v_format.set(self._format_label_for(self.slide.format))
         else:
-            self.format = next(f for f in FORMATOS if f["label"] == label)
+            formato = next(f for f in FORMATOS if f["label"] == label)
+            self.slide.format = {"name": formato["name"], "w": formato["w"], "h": formato["h"]}
         self._schedule_render()
 
     def _sync_format_label(self):
         """Restaura el texto del combobox al formato activo (p.ej. si se cancela el diálogo)."""
-        self.v_format.set(self.format.get("label", FORMATOS[0]["label"]))
+        self.v_format.set(self._format_label_for(self.slide.format))
 
     def _canvas_size_for(self, max_side):
         """Calcula (ancho, alto) en px del lienzo para el formato actual, con el
         lado mayor igual a max_side, manteniendo la proporción del formato."""
-        fw, fh = self.format["w"], self.format["h"]
+        fw, fh = self.slide.format["w"], self.slide.format["h"]
         if fh >= fw:
             h = max_side
             w = max(1, round(max_side * fw / fh))
@@ -321,18 +345,32 @@ class App(tk.Tk):
             filetypes=[("Imágenes", "*.jpg *.jpeg *.png *.webp"), ("Todos", "*.*")])
         if path:
             self.v_photo.set(path)
+            self._layer_by_kind("photo").src = path
             self._schedule_render()
 
-    # ── Capas actuales (Fase 1.3: dicts; Fase 1.4 conecta el modelo formal) ──
+    # ── Capas actuales: adapta el modelo al dict plano que espera render.py ──
     def _build_layers(self):
-        return [
-            {"type": "photo", "src": self.v_photo.get().strip(), **self.el["photo"]},
-            {"type": "logo", **self.el["logo"]},
-            {"type": "title", "text": self.txt_title.get("1.0", "end-1c"), **self.el["title"]},
-            {"type": "sub", "text": self.v_sub.get(), **self.el["sub"]},
-            {"type": "desc", "text": self.txt_desc.get("1.0", "end-1c"),
-             "icon": self.v_icon.get(), **self.el["desc"]},
-        ]
+        layers = []
+        for layer in self.slide.layers:
+            if not layer.visible:
+                continue
+            if layer.type == "photo":
+                layers.append({"type": "photo", "src": self.v_photo.get().strip(),
+                                "zoom": layer.zoom, "offset_x": layer.offset_x,
+                                "offset_y": layer.offset_y})
+            elif layer.type == "logo":
+                layers.append({"type": "logo", "x": layer.x, "y": layer.y, "size": layer.w})
+            elif layer.type == "text" and layer.role == "title":
+                layers.append({"type": "title", "text": self.txt_title.get("1.0", "end-1c"),
+                                "x": layer.x, "y": layer.y, "size": layer.size})
+            elif layer.type == "text" and layer.role == "subtitle":
+                layers.append({"type": "sub", "text": self.v_sub.get(),
+                                "x": layer.x, "y": layer.y, "size": layer.size})
+            elif layer.type == "box":
+                layers.append({"type": "desc", "text": self.txt_desc.get("1.0", "end-1c"),
+                                "icon": self.v_icon.get(), "x": layer.x, "y": layer.y,
+                                "size": layer.size})
+        return layers
 
     # ── Render con debounce ────────────────────────────────────
     def _schedule_render(self, delay=50):
@@ -394,15 +432,16 @@ class App(tk.Tk):
         new_x0 = ix - self._drag_off[0]
         new_y0 = iy - self._drag_off[1]
 
+        layer = self._layer_by_kind(elem)
         if elem == "sub":
             bb = self._last_bboxes.get("sub")
             half_w = (bb[2] - bb[0]) / 2 if bb else 0
             cx = new_x0 + half_w
-            self.el["sub"]["x"] = min(1.0, max(0.0, cx / iw))
-            self.el["sub"]["y"] = min(1.0, max(0.0, new_y0 / ih))
+            layer.x = min(1.0, max(0.0, cx / iw))
+            layer.y = min(1.0, max(0.0, new_y0 / ih))
         else:
-            self.el[elem]["x"] = min(1.0, max(0.0, new_x0 / iw))
-            self.el[elem]["y"] = min(1.0, max(0.0, new_y0 / ih))
+            layer.x = min(1.0, max(0.0, new_x0 / iw))
+            layer.y = min(1.0, max(0.0, new_y0 / ih))
 
         self._sync_sliders()
         self._render_now()
