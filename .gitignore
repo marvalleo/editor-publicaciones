@@ -1,3 +1,6 @@
+# Carpeta vieja vacía (raíz duplicada previa a la reorganización), pendiente de borrado manual
+/editor-publicaciones/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
