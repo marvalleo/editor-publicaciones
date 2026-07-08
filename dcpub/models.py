@@ -1,7 +1,9 @@
-"""Modelo de datos: capas (Layer y subclases) con (de)serialización a dict."""
+"""Modelo de datos: Project, Slide, Layer y subclases, con (de)serialización a dict."""
 
 from dataclasses import dataclass, field, asdict
 import uuid
+
+from .constants import VERDE, BLANCO, BOX_COLOR
 
 
 def _short_id() -> str:
@@ -72,3 +74,60 @@ def layer_from_dict(data: dict) -> Layer:
     """Reconstruye la subclase de Layer correcta según su campo "type"."""
     cls = LAYER_CLASSES[data["type"]]
     return cls(**data)
+
+
+@dataclass
+class Slide:
+    format: dict = field(default_factory=lambda: {"name": "feed_4x5", "w": 1080, "h": 1350})
+    layout_tag: str | None = None
+    layers: list = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "format": dict(self.format),
+            "layout_tag": self.layout_tag,
+            "layers": [layer.to_dict() for layer in self.layers],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Slide":
+        return cls(
+            format=dict(data["format"]),
+            layout_tag=data.get("layout_tag"),
+            layers=[layer_from_dict(l) for l in data.get("layers", [])],
+        )
+
+
+@dataclass
+class Project:
+    version: int = 1
+    name: str = "Proyecto sin título"
+    default_format: dict = field(default_factory=lambda: {"name": "feed_4x5", "w": 1080, "h": 1350})
+    palette: dict = field(default_factory=lambda: {
+        "verde": list(VERDE),
+        "blanco": list(BLANCO),
+        "box": list(BOX_COLOR),
+    })
+    shared: dict = field(default_factory=dict)
+    slides: list = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "version": self.version,
+            "name": self.name,
+            "default_format": dict(self.default_format),
+            "palette": dict(self.palette),
+            "shared": dict(self.shared),
+            "slides": [slide.to_dict() for slide in self.slides],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Project":
+        return cls(
+            version=data.get("version", 1),
+            name=data.get("name", "Proyecto sin título"),
+            default_format=dict(data["default_format"]),
+            palette=dict(data["palette"]),
+            shared=dict(data.get("shared", {})),
+            slides=[Slide.from_dict(s) for s in data.get("slides", [])],
+        )
