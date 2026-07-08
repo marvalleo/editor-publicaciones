@@ -31,6 +31,8 @@ SIZE_RANGE = {
 
 LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción"}
 
+HANDLE_SIZE = 5  # medio-lado del cuadradito de cada handle, en px de pantalla
+
 
 class App(tk.Tk):
     def __init__(self):
@@ -68,6 +70,8 @@ class App(tk.Tk):
         self._last_bboxes = {}
         self._img_wh = (0, 0)        # tamaño en px de la imagen mostrada
         self._selected = None        # Layer seleccionada actualmente, o None
+        self._handles = {}           # {nombre_handle: (x,y) en px de pantalla}
+        self._resize = None          # estado del arrastre de resize en curso, o None
 
         self._build_ui()
 
@@ -320,6 +324,7 @@ class App(tk.Tk):
             f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  Tamaño: {tam:.3f}")
 
     def _draw_selection_overlay(self):
+        self._handles = {}
         if self._selected is None:
             return
         kind = self._kind_of(self._selected)
@@ -329,6 +334,54 @@ class App(tk.Tk):
         ox, oy = self._img_origin
         x0, y0, x1, y1 = bb[0] + ox, bb[1] + oy, bb[2] + ox, bb[3] + oy
         self.canvas.create_rectangle(x0, y0, x1, y1, outline=ACCENT, width=2, dash=(4, 2))
+
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        points = {
+            "nw": (x0, y0), "n": (mx, y0), "ne": (x1, y0),
+            "w": (x0, my), "e": (x1, my),
+            "sw": (x0, y1), "s": (mx, y1), "se": (x1, y1),
+        }
+        for name, (hx, hy) in points.items():
+            self.canvas.create_rectangle(
+                hx - HANDLE_SIZE, hy - HANDLE_SIZE, hx + HANDLE_SIZE, hy + HANDLE_SIZE,
+                fill=ACCENT, outline=DARK)
+            self._handles[name] = (hx, hy)
+
+    # ── Resize con handles ──────────────────────────────────────
+    def _handle_at(self, cx, cy):
+        """Devuelve el nombre del handle bajo el punto de pantalla (cx,cy), o None."""
+        for name, (hx, hy) in self._handles.items():
+            if abs(cx - hx) <= HANDLE_SIZE + 2 and abs(cy - hy) <= HANDLE_SIZE + 2:
+                return name
+        return None
+
+    def _start_resize(self, event):
+        kind = self._kind_of(self._selected)
+        bb = self._last_bboxes.get(kind)
+        if not bb:
+            return
+        x0, y0, x1, y1 = bb
+        cx_img, cy_img = (x0 + x1) / 2, (y0 + y1) / 2
+        ix, iy = self._canvas_to_img(event.x, event.y)
+        start_dist = max(1.0, ((ix - cx_img) ** 2 + (iy - cy_img) ** 2) ** 0.5)
+        self._resize = {
+            "kind": kind,
+            "center": (cx_img, cy_img),
+            "start_dist": start_dist,
+            "start_value": self._get_layer_value(kind, "size"),
+        }
+
+    def _apply_resize(self, event):
+        kind = self._resize["kind"]
+        cx_img, cy_img = self._resize["center"]
+        ix, iy = self._canvas_to_img(event.x, event.y)
+        dist = max(1.0, ((ix - cx_img) ** 2 + (iy - cy_img) ** 2) ** 0.5)
+        ratio = dist / self._resize["start_dist"]
+        smin, smax = SIZE_RANGE[kind]
+        new_value = min(smax, max(smin, self._resize["start_value"] * ratio))
+        self._set_layer_value(kind, "size", new_value)
+        self._sync_sliders()
+        self._render_now()
 
     # ── Formato ────────────────────────────────────────────────
     def _format_label_for(self, fmt):
@@ -453,6 +506,12 @@ class App(tk.Tk):
         return ex - ox, ey - oy
 
     def _on_press(self, event):
+        if self._selected is not None:
+            handle = self._handle_at(event.x, event.y)
+            if handle is not None:
+                self._start_resize(event)
+                return
+
         ix, iy = self._canvas_to_img(event.x, event.y)
         for elem in reversed(ELEMENTS):
             layer = self._layer_by_kind(elem)
@@ -468,6 +527,9 @@ class App(tk.Tk):
         self._set_selected(None)
 
     def _on_drag(self, event):
+        if self._resize is not None:
+            self._apply_resize(event)
+            return
         if not self._drag_elem:
             return
         elem = self._drag_elem
@@ -494,6 +556,7 @@ class App(tk.Tk):
 
     def _on_release(self, event):
         self._drag_elem = None
+        self._resize = None
 
     # ── Generar en alta resolución ─────────────────────────────
     def _generate(self):
