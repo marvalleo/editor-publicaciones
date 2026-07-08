@@ -43,6 +43,7 @@ class TestFactory(unittest.TestCase):
         photo = self.slide.layers[0]
         self.assertEqual(photo.src, "foto.jpg")
         self.assertEqual((photo.x, photo.y, photo.w, photo.h), (0.0, 0.0, 1.0, 1.0))
+        self.assertEqual((photo.offset_x, photo.offset_y), (0.5, 0.5))
 
     def test_logo_layer_points_to_logo_file(self):
         logo = self.slide.layers[1]

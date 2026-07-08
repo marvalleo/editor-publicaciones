@@ -137,7 +137,7 @@ def crear_proyecto_por_defecto(photo_path: str = "") -> Project:
     """Crea el proyecto por defecto (foto + logo + título + subtítulo + caja) con los valores de v2.0."""
     slide = Slide()
     slide.layers = [
-        PhotoLayer(name="Foto", z=0, x=0.0, y=0.0, w=1.0, h=1.0, src=photo_path),
+        PhotoLayer(name="Foto", z=0, x=0.0, y=0.0, w=1.0, h=1.0, src=photo_path, offset_x=0.5, offset_y=0.5),
         LogoLayer(name="Logo", z=1, x=0.40, y=0.022, w=0.20, h=0.20, src=str(LOGO_FILE)),
         TextLayer(name="Título", z=2, x=0.055, y=0.42, role="title", size=0.087,
                   text="Tu título aquí"),
