@@ -79,3 +79,9 @@ compartido activo). Los 3 corregidos en 2 commits de fix (4ad8f0f, aa18438), con
 reproducen los escenarios reales. Suite final: 179 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge.
+
+# Progreso — Fase 3 foto base
+
+Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
+
+- Tarea 1 (fix adjust/overlay no llegaban al render): complete (commit 5dd7835..e135b9e, review clean, 190 tests)
