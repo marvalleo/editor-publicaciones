@@ -187,16 +187,24 @@ def compose(layers, canvas_size, font_manager):
                 widest = 0
                 shadow_color = _apply_opacity((0, 0, 0, 160), opacity)
                 text_color = _apply_opacity(BLANCO + (255,), opacity)
-                text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                text_draw = ImageDraw.Draw(text_layer)
-                for i, line in enumerate(lines):
-                    yy = ty + i * lh
-                    text_draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
-                    text_draw.text((tx, yy), line, font=font_t, fill=text_color)
-                    bb = draw.textbbox((tx, yy), line, font=font_t)
-                    widest = max(widest, bb[2] - tx)
-                canvas = Image.alpha_composite(canvas, text_layer)
-                draw = ImageDraw.Draw(canvas)
+                if opacity < 1.0:
+                    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    text_draw = ImageDraw.Draw(text_layer)
+                    for i, line in enumerate(lines):
+                        yy = ty + i * lh
+                        text_draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
+                        text_draw.text((tx, yy), line, font=font_t, fill=text_color)
+                        bb = draw.textbbox((tx, yy), line, font=font_t)
+                        widest = max(widest, bb[2] - tx)
+                    canvas = Image.alpha_composite(canvas, text_layer)
+                    draw = ImageDraw.Draw(canvas)
+                else:
+                    for i, line in enumerate(lines):
+                        yy = ty + i * lh
+                        draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
+                        draw.text((tx, yy), line, font=font_t, fill=text_color)
+                        bb = draw.textbbox((tx, yy), line, font=font_t)
+                        widest = max(widest, bb[2] - tx)
                 bboxes["title"] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
 
         elif kind == "sub":
@@ -222,13 +230,18 @@ def compose(layers, canvas_size, font_manager):
                 deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
                 canvas = Image.alpha_composite(canvas, deco_layer)
                 draw = ImageDraw.Draw(canvas)
-                text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                text_draw = ImageDraw.Draw(text_layer)
-                text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
-                               fill=_apply_opacity((0, 0, 0, 130), opacity))
-                text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                canvas = Image.alpha_composite(canvas, text_layer)
-                draw = ImageDraw.Draw(canvas)
+                if opacity < 1.0:
+                    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    text_draw = ImageDraw.Draw(text_layer)
+                    text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                                   fill=_apply_opacity((0, 0, 0, 130), opacity))
+                    text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
+                    canvas = Image.alpha_composite(canvas, text_layer)
+                    draw = ImageDraw.Draw(canvas)
+                else:
+                    draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                              fill=_apply_opacity((0, 0, 0, 130), opacity))
+                    draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
                 bboxes["sub"] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
         elif kind == "desc":

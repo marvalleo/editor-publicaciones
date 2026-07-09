@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from dcpub.constants import VERDE, BLANCO
 from dcpub.fonts import FontManager
 from dcpub.render import compose, wrap_text, _get_background, _apply_opacity
 
@@ -220,6 +221,80 @@ class TestCompose(unittest.TestCase):
         img_with, _ = compose(layers_with, (400, 500), self.font_manager)
         img_without, _ = compose(layers_without, (400, 500), self.font_manager)
         self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
+
+    def test_title_and_sub_opacity_one_matches_original_direct_draw(self):
+        """Regresión: a opacity=1.0 (default), title/sub deben verse pixel-identicos
+        a como se veian ANTES de que existiera el soporte de opacidad (sin el
+        composite de capa transparente, que puede redondear distinto en los bordes
+        antialiased donde la sombra se superpone al texto)."""
+        from PIL import Image as PILImage, ImageDraw as PILImageDraw
+
+        def _reference_compose(layers, canvas_size, font_manager):
+            # Copia minima de la logica pre-opacidad de title/sub (antes de esta
+            # tarea), dibujando siempre directo sobre el canvas compartido, sin
+            # capa intermedia. Sirve de oraculo independiente para este test.
+            W, H = canvas_size
+            canvas = PILImage.new("RGBA", (W, H), (0, 0, 0, 0))
+            draw = PILImageDraw.Draw(canvas)
+            margin = int(W * 0.055)
+            for layer in layers:
+                kind = layer["type"]
+                if kind == "photo":
+                    canvas = _get_background(
+                        layer["src"], (W, H),
+                        zoom=layer.get("zoom", 1.0),
+                        offset_x=layer.get("offset_x", 0.5),
+                        offset_y=layer.get("offset_y", 0.5),
+                    )
+                    draw = PILImageDraw.Draw(canvas)
+                elif kind == "title":
+                    title = layer["text"]
+                    if title.strip():
+                        tsz = max(10, int(W * layer["size"]))
+                        font_t = font_manager.load("title", tsz)
+                        tx = int(layer["x"] * W)
+                        ty = int(layer["y"] * H)
+                        max_w = W - tx - margin
+                        lines = []
+                        for part in title.split("\n"):
+                            part = part.strip()
+                            if part:
+                                lines += wrap_text(part, font_t, max_w, draw)
+                        lh = int(tsz * 1.22)
+                        for i, line in enumerate(lines):
+                            yy = ty + i * lh
+                            draw.text((tx + 3, yy + 3), line, font=font_t, fill=(0, 0, 0, 160))
+                            draw.text((tx, yy), line, font=font_t, fill=BLANCO + (255,))
+                elif kind == "sub":
+                    subtitle = layer["text"]
+                    if subtitle.strip():
+                        ssz = max(8, int(W * layer["size"]))
+                        font_s = font_manager.load("subtitle", ssz)
+                        cx = int(layer["x"] * W)
+                        sy = int(layer["y"] * H)
+                        bb = draw.textbbox((0, 0), subtitle, font=font_s)
+                        sw, sh = bb[2] - bb[0], bb[3] - bb[1]
+                        sx = cx - sw // 2
+                        ly = sy + sh // 2
+                        lw_deco = max(2, int(W * 0.003))
+                        line_len = int(W * 0.11)
+                        gap = int(W * 0.03)
+                        lx1 = max(0, sx - gap - line_len)
+                        draw.line([(lx1, ly), (sx - gap, ly)], fill=VERDE, width=lw_deco)
+                        rx2 = min(W, sx + sw + gap + line_len)
+                        draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=VERDE, width=lw_deco)
+                        draw.text((sx + 2, sy + 2), subtitle, font=font_s, fill=(0, 0, 0, 130))
+                        draw.text((sx, sy), subtitle, font=font_s, fill=VERDE)
+            return canvas
+
+        layers = [
+            {"type": "photo", "src": str(self.photo_path)},
+            {"type": "title", "text": "Título de prueba", "x": 0.055, "y": 0.42, "size": 0.087},
+            {"type": "sub", "text": "frase secundaria", "x": 0.50, "y": 0.55, "size": 0.050},
+        ]
+        img_current, _ = compose(layers, (400, 500), self.font_manager)
+        img_reference = _reference_compose(layers, (400, 500), self.font_manager)
+        self.assertEqual(list(img_current.getdata()), list(img_reference.getdata()))
 
 
 class TestGetBackground(unittest.TestCase):
