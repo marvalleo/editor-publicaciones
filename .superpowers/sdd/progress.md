@@ -11,3 +11,4 @@ Plan: docs/superpowers/plans/2026-07-08-fase1-tareas-1.6-1.9.md
 - Tarea 2 (undo/redo): pendiente
 - Tarea 3 (guardar/abrir proyecto): pendiente
 - Tarea 4 (exportar): pendiente
+- Tarea 2 (undo/redo): complete (commits ebb6544..a80b4ea, review clean, 19 tests en test_commands.py)
