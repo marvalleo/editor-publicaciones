@@ -1235,7 +1235,8 @@ class App(tk.Tk):
                        if es_activa and layer is self._layer_by_kind("photo", slide) else layer.src)
                 layers.append({"type": "photo", "key": layer.id, "src": src,
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
-                                "offset_y": layer.offset_y, "opacity": layer.opacity})
+                                "offset_y": layer.offset_y, "opacity": layer.opacity,
+                                "adjust": layer.adjust, "overlay": layer.overlay})
             elif layer.type == "logo":
                 if shared_logo is not None:
                     layers.append({"type": "logo", "key": layer.id,

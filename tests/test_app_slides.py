@@ -273,6 +273,20 @@ class TestBuildLayersFor(unittest.TestCase):
         titulo = next(c for c in capas if c["type"] == "title")
         self.assertEqual(titulo["text"], "Via _build_layers")
 
+    def test_build_layers_for_includes_photo_adjust_and_overlay(self):
+        app = _make_app_with_two_slides()
+        foto = App._layer_by_kind(app, "photo", app.slide)
+        foto.adjust["brightness"] = 1.3
+        foto.overlay["bottom_grad"] = True
+        foto.overlay["strength"] = 0.7
+
+        capas = App._build_layers_for(app, app.slide)
+
+        foto_capa = next(c for c in capas if c["type"] == "photo")
+        self.assertEqual(foto_capa["adjust"]["brightness"], 1.3)
+        self.assertTrue(foto_capa["overlay"]["bottom_grad"])
+        self.assertEqual(foto_capa["overlay"]["strength"], 0.7)
+
 
 class TestSharedLogo(unittest.TestCase):
     def setUp(self):
