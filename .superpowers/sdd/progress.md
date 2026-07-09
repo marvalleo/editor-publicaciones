@@ -131,3 +131,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
   original rompia el fixture headless al disparar _render_now via v_photo inexistente); se uso
   self._selected + _build_property_panel directo, con el mismo _refresh_layers_list/_schedule_render
   que ya traia el brief. Sin regresion de comportamiento en la app real.
+- Tarea 10 (verificacion headless de cierre): complete (commit 33274a1..2bdde38, review clean, 247 tests, HEADLESS_OK)
