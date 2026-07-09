@@ -130,7 +130,7 @@ class TestImportarCarruselPorLotes(unittest.TestCase):
         descripcion = _capa_por_tipo(project.slides[0], "box").text
         self.assertEqual(descripcion, "• Parrilla privada\n• Desayuno incluido")
 
-    def test_cta_se_preserva_sin_renderizarse_como_capa(self):
+    def test_cta_se_preserva_en_extra_y_se_crea_como_capa_real(self):
         _crear_imagen(self.carpeta / "01.jpg")
         _guardar_json(self.carpeta / "copys.json", [
             {
@@ -145,11 +145,20 @@ class TestImportarCarruselPorLotes(unittest.TestCase):
         project, _ = importar_carrusel_por_lotes(self.carpeta, FORMATO_CUADRADO)
 
         self.assertEqual(project.slides[0].extra["cta"], "Reserva ahora")
-        textos_renderizables = [
-            getattr(layer, "text", "")
-            for layer in project.slides[0].layers
-        ]
-        self.assertNotIn("Reserva ahora", textos_renderizables)
+        cta_layers = [l for l in project.slides[0].layers if l.type == "cta"]
+        self.assertEqual(len(cta_layers), 1)
+        self.assertEqual(cta_layers[0].text, "Reserva ahora")
+
+    def test_cta_vacio_no_crea_capa(self):
+        _crear_imagen(self.carpeta / "01.jpg")
+        _guardar_json(self.carpeta / "copys.json", [
+            {"imagen": "01.jpg", "titulo": "", "subtitulo": "", "beneficios": [], "cta": ""}
+        ])
+
+        project, _ = importar_carrusel_por_lotes(self.carpeta, FORMATO_CUADRADO)
+
+        cta_layers = [l for l in project.slides[0].layers if l.type == "cta"]
+        self.assertEqual(cta_layers, [])
 
 
 if __name__ == "__main__":

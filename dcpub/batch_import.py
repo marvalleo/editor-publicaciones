@@ -33,8 +33,8 @@ def _beneficios_a_descripcion(beneficios) -> str:
 def importar_carrusel_por_lotes(carpeta: Path, formato: dict) -> tuple[Project, list[str]]:
     """Crea un Project multi-lámina desde fotos y un JSON de copys.
 
-    El CTA se preserva por lámina en ``slide.extra["cta"]``. No se convierte en
-    capa visual porque todavía no existe CTALayer en el modelo/render.
+    El CTA se preserva por lámina en ``slide.extra["cta"]`` y además se crea
+    como ``CTALayer`` real en ``slide.layers`` cuando el texto no está vacío.
     """
     carpeta = Path(carpeta)
     json_path = _buscar_json_unico(carpeta)
@@ -72,7 +72,13 @@ def importar_carrusel_por_lotes(carpeta: Path, formato: dict) -> tuple[Project, 
             descripcion=_beneficios_a_descripcion(entrada.get("beneficios", [])),
             formato=formato,
         )
-        slide.extra["cta"] = str(entrada.get("cta", ""))
+        cta_texto = str(entrada.get("cta", ""))
+        slide.extra["cta"] = cta_texto
+        if cta_texto.strip():
+            from .models import CTALayer
+            cta_layer = CTALayer(name="CTA", z=max((l.z for l in slide.layers), default=0) + 1,
+                                  text=cta_texto, x=0.10, y=0.90, w=0.35, h=0.08)
+            slide.layers.append(cta_layer)
         project.slides.append(slide)
 
     return project, advertencias
