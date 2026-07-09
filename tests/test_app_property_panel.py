@@ -170,5 +170,69 @@ class TestColorAlphaCommit(unittest.TestCase):
         self.assertEqual(len(self.app.commands._undo_stack), 0)
 
 
+class TestAddCTALayer(unittest.TestCase):
+    def test_add_cta_layer_appends_layer_and_selects_it(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import crear_proyecto_por_defecto
+        app = App.__new__(App)
+        app.project = crear_proyecto_por_defecto("foto.jpg")
+        app.slide = app.project.slides[0]
+        app.commands = CommandStack()
+        app._selected = None
+        app._refresh_layers_list = lambda: None
+        app._schedule_render = lambda: None
+        app._build_property_panel = lambda: None
+
+        cantidad_antes = len(app.slide.layers)
+        App._add_cta_layer(app)
+
+        self.assertEqual(len(app.slide.layers), cantidad_antes + 1)
+        nueva = app.slide.layers[-1]
+        self.assertEqual(nueva.type, "cta")
+        self.assertIs(app._selected, nueva)
+
+    def test_add_cta_layer_is_undoable(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import crear_proyecto_por_defecto
+        app = App.__new__(App)
+        app.project = crear_proyecto_por_defecto("foto.jpg")
+        app.slide = app.project.slides[0]
+        app.commands = CommandStack()
+        app._selected = None
+        app._refresh_layers_list = lambda: None
+        app._schedule_render = lambda: None
+        app._build_property_panel = lambda: None
+
+        cantidad_antes = len(app.slide.layers)
+        App._add_cta_layer(app)
+        app.commands.undo()
+
+        self.assertEqual(len(app.slide.layers), cantidad_antes)
+
+
+class TestCTATextFieldCommit(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import CTALayer
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app._schedule_render = lambda: None
+        self.layer = CTALayer(text="Texto original")
+
+    def test_commit_pushes_property_change_command(self):
+        old_value = self.layer.text
+        self.layer.text = "Texto nuevo"
+
+        App._on_cta_text_commit(self.app, self.layer, old_value, "Texto nuevo")
+
+        self.assertEqual(len(self.app.commands._undo_stack), 1)
+        self.app.commands.undo()
+        self.assertEqual(self.layer.text, "Texto original")
+
+    def test_commit_with_same_value_pushes_nothing(self):
+        App._on_cta_text_commit(self.app, self.layer, "Texto original", "Texto original")
+        self.assertEqual(len(self.app.commands._undo_stack), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

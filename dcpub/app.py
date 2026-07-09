@@ -265,6 +265,10 @@ class App(tk.Tk):
         self._layers_list_frame.pack(fill=tk.X, pady=(0, 10), **pad)
         self._refresh_layers_list()
 
+        tk.Button(left, text="+ Agregar CTA", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._add_cta_layer).pack(
+            fill=tk.X, pady=(0, 10), **pad)
+
         # Foto
         tk.Label(left, text="📷  Foto", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", **pad)
@@ -526,6 +530,19 @@ class App(tk.Tk):
         self._refresh_layers_list()
         self._schedule_render()
 
+    def _add_cta_layer(self):
+        from .models import CTALayer
+        from .commands import AddLayerCommand
+        new_z = max((l.z for l in self.slide.layers), default=0) + 1
+        new_layer = CTALayer(name="CTA", z=new_z, text="Reservá ahora",
+                              x=0.10, y=0.90, w=0.35, h=0.08)
+        index = len(self.slide.layers)
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
+        self._selected = new_layer
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
     def _delete_layer(self, layer):
         from .commands import DeleteLayerCommand
         self.commands.push(DeleteLayerCommand(self.slide.layers, layer))
@@ -600,6 +617,23 @@ class App(tk.Tk):
             self._slider(card, token, "h", "Alto de la caja", 0.03, 0.50, disabled=disabled)
             self._color_picker(card, layer, "fill", "Color de la caja", disabled=disabled)
             self._color_picker(card, layer, "text_color", "Color del texto", disabled=disabled)
+        if kind == "cta":
+            tk.Label(card, text="Texto del CTA", bg=PANEL, fg=TEXT,
+                     font=("Segoe UI", 8)).pack(anchor="w", pady=(8, 0))
+            cta_text_var = tk.StringVar(value=layer.text)
+            cta_entry = tk.Entry(card, textvariable=cta_text_var, bg=FIELD, fg=TEXT,
+                                  insertbackground=TEXT, relief="flat", bd=2,
+                                  font=("Segoe UI", 9),
+                                  state=tk.DISABLED if disabled else tk.NORMAL)
+            cta_entry.pack(fill=tk.X)
+            cta_entry.bind(
+                "<Return>",
+                lambda e, l=layer, old=layer.text, v=cta_text_var:
+                    self._on_cta_text_commit(l, old, v.get()))
+            cta_entry.bind(
+                "<FocusOut>",
+                lambda e, l=layer, old=layer.text, v=cta_text_var:
+                    self._on_cta_text_commit(l, old, v.get()))
         self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
         self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
@@ -694,6 +728,12 @@ class App(tk.Tk):
                    lambda e, elem=elem, param=param, lo=lo, hi=hi, ap=as_percent,
                    var=var, ev=entry_var: self._on_entry_commit(elem, param, lo, hi, ap, var, ev))
         self.ctrl[elem][param + "_entry"] = entry_var
+
+    def _on_cta_text_commit(self, layer, old_value, new_value):
+        if old_value != new_value:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(layer, "text", old_value, new_value))
+        self._schedule_render()
 
     def _on_entry_commit(self, elem, param, lo, hi, as_percent, var, entry_var):
         raw = entry_var.get().strip().replace(",", ".")
