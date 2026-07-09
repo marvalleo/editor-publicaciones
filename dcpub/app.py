@@ -128,7 +128,11 @@ class App(tk.Tk):
         from .commands import CommandStack
         self.commands = CommandStack(on_change=self._on_commands_changed)
 
+        self._project_path = None   # Path del .json actual, o None si es nuevo/sin guardar
+        self._dirty = False         # True si hay cambios sin guardar
+
         self._build_ui()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Descargar fuentes en segundo plano
         self.v_status.set("Descargando fuentes… (solo la primera vez)")
@@ -722,7 +726,37 @@ class App(tk.Tk):
 
     def _on_commands_changed(self):
         """Callback del CommandStack: se ejecuta en cada push/undo/redo."""
-        pass  # La Tarea 3 (guardar/abrir) engancha aquí el flag de "sin guardar".
+        self._set_dirty(True)
+
+    def _set_dirty(self, value):
+        self._dirty = value
+        self._update_title()
+
+    def _update_title(self):
+        base = "Generador de Publicaciones — Cabañas Don Cristobal"
+        if self._project_path is not None:
+            base += f" — {self._project_path.name}"
+        if self._dirty:
+            base += " *"
+        self.title(base)
+
+    def _sync_text_to_layers(self):
+        """Copia el contenido actual de los widgets de texto a los campos
+        text/icon/src del modelo, para que guardar/exportar reflejen lo que se
+        ve en pantalla."""
+        title_layer = self._layer_by_kind("title")
+        if title_layer is not None:
+            title_layer.text = self.txt_title.get("1.0", "end-1c")
+        sub_layer = self._layer_by_kind("sub")
+        if sub_layer is not None:
+            sub_layer.text = self.v_sub.get()
+        desc_layer = self._layer_by_kind("desc")
+        if desc_layer is not None:
+            desc_layer.text = self.txt_desc.get("1.0", "end-1c")
+            desc_layer.icon = self.v_icon.get()
+        photo_layer = self._layer_by_kind("photo")
+        if photo_layer is not None:
+            photo_layer.src = self.v_photo.get().strip()
 
     def _undo(self):
         if self.commands.undo():
