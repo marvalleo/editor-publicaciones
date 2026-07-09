@@ -5,6 +5,7 @@ import unittest
 from dcpub.commands import (
     CommandStack, PropertyChangeCommand, AddLayerCommand, DeleteLayerCommand,
     ReorderLayerCommand, CompositeCommand,
+    AddSlideCommand, DeleteSlideCommand, ReorderSlideCommand,
 )
 
 
@@ -77,6 +78,57 @@ class TestReorderLayerCommand(unittest.TestCase):
         cmd.execute()
         cmd.undo()
         self.assertEqual((a.z, b.z), (1, 2))
+
+
+class TestAddSlideCommand(unittest.TestCase):
+    def test_execute_inserts_at_index(self):
+        slides = [_Dummy(name="a"), _Dummy(name="c")]
+        new = _Dummy(name="b")
+        cmd = AddSlideCommand(slides, new, 1)
+        cmd.execute()
+        self.assertEqual([s.name for s in slides], ["a", "b", "c"])
+
+    def test_undo_removes_it(self):
+        slides = [_Dummy(name="a"), _Dummy(name="c")]
+        new = _Dummy(name="b")
+        cmd = AddSlideCommand(slides, new, 1)
+        cmd.execute()
+        cmd.undo()
+        self.assertEqual([s.name for s in slides], ["a", "c"])
+
+
+class TestDeleteSlideCommand(unittest.TestCase):
+    def test_execute_removes_slide(self):
+        a, b, c = _Dummy(name="a"), _Dummy(name="b"), _Dummy(name="c")
+        slides = [a, b, c]
+        cmd = DeleteSlideCommand(slides, b)
+        cmd.execute()
+        self.assertEqual([s.name for s in slides], ["a", "c"])
+
+    def test_undo_reinserts_at_original_index(self):
+        a, b, c = _Dummy(name="a"), _Dummy(name="b"), _Dummy(name="c")
+        slides = [a, b, c]
+        cmd = DeleteSlideCommand(slides, b)
+        cmd.execute()
+        cmd.undo()
+        self.assertEqual([s.name for s in slides], ["a", "b", "c"])
+
+
+class TestReorderSlideCommand(unittest.TestCase):
+    def test_execute_swaps_positions(self):
+        a, b, c = _Dummy(name="a"), _Dummy(name="b"), _Dummy(name="c")
+        slides = [a, b, c]
+        cmd = ReorderSlideCommand(slides, 0, 2)
+        cmd.execute()
+        self.assertEqual([s.name for s in slides], ["c", "b", "a"])
+
+    def test_undo_swaps_back(self):
+        a, b, c = _Dummy(name="a"), _Dummy(name="b"), _Dummy(name="c")
+        slides = [a, b, c]
+        cmd = ReorderSlideCommand(slides, 0, 2)
+        cmd.execute()
+        cmd.undo()
+        self.assertEqual([s.name for s in slides], ["a", "b", "c"])
 
 
 class TestCompositeCommand(unittest.TestCase):
