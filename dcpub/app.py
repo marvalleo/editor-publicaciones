@@ -31,6 +31,29 @@ SIZE_RANGE = {
 
 LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción"}
 
+# Rangos de los ajustes fotográficos, alineados a los clamps de render.py
+ADJUST_RANGE = {
+    "brightness": (0.0, 2.0),
+    "contrast": (0.0, 2.0),
+    "saturation": (0.0, 2.0),
+    "warmth": (-1.0, 1.0),
+    "sharpness": (0.0, 2.0),
+    "shadows": (-1.0, 1.0),
+    "vignette": (0.0, 1.0),
+}
+
+ADJUST_LABELS = {
+    "brightness": "Brillo",
+    "contrast": "Contraste",
+    "saturation": "Saturación",
+    "warmth": "Calidez",
+    "sharpness": "Nitidez",
+    "shadows": "Sombras",
+    "vignette": "Viñeta",
+}
+
+OVERLAY_STRENGTH_RANGE = (0.0, 1.0)
+
 HANDLE_SIZE = 5  # medio-lado del cuadradito de cada handle, en px de pantalla
 NUDGE_STEP = 0.004        # paso normal (fracción del lienzo)
 NUDGE_STEP_SHIFT = 0.02   # paso grande (Shift)
