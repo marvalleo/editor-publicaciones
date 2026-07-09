@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "name": "Cierre Fase 1",
+  "default_format": {
+    "name": "feed_4x5",
+    "w": 1080,
+    "h": 1350
+  },
+  "palette": {
+    "verde": [
+      141,
+      194,
+      111
+    ],
+    "blanco": [
+      255,
+      255,
+      255
+    ],
+    "box": [
+      40,
+      25,
+      15,
+      215
+    ]
+  },
+  "shared": {},
+  "slides": [
+    {
+      "format": {
+        "name": "feed_4x5",
+        "w": 1080,
+        "h": 1350
+      },
+      "layout_tag": null,
+      "layers": [
+        {
+          "id": "b35e868f",
+          "name": "Foto",
+          "type": "photo",
+          "visible": true,
+          "locked": false,
+          "z": 0,
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "h": 1.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "src": "foto_base_control.png",
+          "fit": "cover",
+          "zoom": 1.0,
+          "offset_x": 0.5,
+          "offset_y": 0.5
+        },
+        {
+          "id": "4fbd3b9d",
+          "name": "Logo",
+          "type": "logo",
+          "visible": true,
+          "locked": false,
+          "z": 1,
+          "x": 0.4,
+          "y": 0.022,
+          "w": 0.2,
+          "h": 0.2,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "src": "C:\\Users\\MIPC\\Desktop\\Proyectos Corex\\editor-publicaciones\\logo-sin-fondo.png",
+          "keep_ratio": true
+        },
+        {
+          "id": "ba3d8962",
+          "name": "Título",
+          "type": "text",
+          "visible": true,
+          "locked": false,
+          "z": 2,
+          "x": 0.055,
+          "y": 0.42,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "Cierre Fase 1",
+          "role": "title",
+          "size": 0.087
+        },
+        {
+          "id": "3d3ffdd9",
+          "name": "Subtítulo",
+          "type": "text",
+          "visible": true,
+          "locked": false,
+          "z": 3,
+          "x": 0.5,
+          "y": 0.55,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "editor visual",
+          "role": "subtitle",
+          "size": 0.05
+        },
+        {
+          "id": "31e1bf70",
+          "name": "Descripción",
+          "type": "box",
+          "visible": true,
+          "locked": false,
+          "z": 4,
+          "x": 0.05,
+          "y": 0.808,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "Guardar, cargar y exportar verificado sin abrir la GUI.",
+          "icon": "planta",
+          "size": 0.033
+        }
+      ]
+    }
+  ]
+}

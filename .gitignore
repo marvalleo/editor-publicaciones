@@ -219,3 +219,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.code-graph/
+
+# Claude Code / herramientas locales
+.claude/
+.atl/
