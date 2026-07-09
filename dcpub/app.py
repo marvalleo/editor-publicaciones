@@ -644,8 +644,12 @@ class App(tk.Tk):
         if old_value != value:
             layer = self._layer_by_token(elem)
             kind = self._kind_of(layer)
-            from .commands import PropertyChangeCommand, CompositeCommand
-            if kind == "logo" and param == "size":
+            from .commands import PropertyChangeCommand, CompositeCommand, DictItemChangeCommand
+            if "." in param:
+                group, key = param.split(".", 1)
+                self.commands.push(
+                    DictItemChangeCommand(getattr(layer, group), key, old_value, value))
+            elif kind == "logo" and param == "size":
                 self.commands.push(CompositeCommand([
                     PropertyChangeCommand(layer, "w", old_value, value),
                     PropertyChangeCommand(layer, "h", old_value, value),
@@ -764,12 +768,19 @@ class App(tk.Tk):
 
     def _get_layer_value(self, elem, param):
         layer = self._layer_by_token(elem)
+        if "." in param:
+            group, key = param.split(".", 1)
+            return getattr(layer, group)[key]
         if self._kind_of(layer) == "logo" and param == "size":
             return layer.w
         return getattr(layer, param)
 
     def _set_layer_value(self, elem, param, value):
         layer = self._layer_by_token(elem)
+        if "." in param:
+            group, key = param.split(".", 1)
+            getattr(layer, group)[key] = value
+            return
         if self._kind_of(layer) == "logo" and param == "size":
             layer.w = value
             layer.h = value
@@ -809,8 +820,13 @@ class App(tk.Tk):
             return
         new_value = self._get_layer_value(elem, param)
         if old_value != new_value:
-            from .commands import PropertyChangeCommand
-            self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
+            from .commands import PropertyChangeCommand, DictItemChangeCommand
+            if "." in param:
+                group, key = param.split(".", 1)
+                self.commands.push(
+                    DictItemChangeCommand(getattr(layer, group), key, old_value, new_value))
+            else:
+                self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
             if kind == "logo":
                 self._sync_shared_logo_if_active()
 
