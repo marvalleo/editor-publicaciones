@@ -113,7 +113,7 @@ class SlidesPanel(tk.Frame):
         self.refresh()
 
     def _thumbnail_for(self, slide):
-        firma = slide.to_dict()
+        firma = (slide.to_dict(), self.app.project.shared.get("logo"))
         cache_key = id(slide)
         cached = self._thumb_cache.get(cache_key)
         if cached is not None and cached[0] == firma:

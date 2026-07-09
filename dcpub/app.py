@@ -629,6 +629,8 @@ class App(tk.Tk):
                 ]))
             else:
                 self.commands.push(PropertyChangeCommand(layer, param, old_value, value))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
         self._schedule_render()
 
     def _toggle_visible(self):
@@ -778,11 +780,14 @@ class App(tk.Tk):
                     PropertyChangeCommand(layer, "w", old_value, new_w),
                     PropertyChangeCommand(layer, "h", old_value, new_h),
                 ]))
+            self._sync_shared_logo_if_active()
             return
         new_value = self._get_layer_value(elem, param)
         if old_value != new_value:
             from .commands import PropertyChangeCommand
             self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
 
     def _sync_sliders(self):
         """Refleja el estado actual en los controles del panel activo, sin disparar render."""
@@ -996,7 +1001,18 @@ class App(tk.Tk):
 
     def _after_history_change(self):
         """Refresca toda la UI después de un undo/redo, porque el modelo
-        cambió por fuera del flujo normal de edición."""
+        cambió por fuera del flujo normal de edición. Si self.slide ya no
+        está en project.slides (undo/redo de una operación de lámina la
+        agregó o quitó), reconcilia el puntero de lámina activa antes de
+        refrescar nada más."""
+        if self.slide in self.project.slides:
+            self.current_slide_index = self.project.slides.index(self.slide)
+        else:
+            self.current_slide_index = min(self.current_slide_index,
+                                            len(self.project.slides) - 1)
+            self.slide = self.project.slides[self.current_slide_index]
+            self._selected = None
+            self._sync_widgets_from_slide()
         self._sync_sliders()
         self._build_property_panel()
         self._refresh_layers_list()
@@ -1370,6 +1386,8 @@ class App(tk.Tk):
                     PropertyChangeCommand(layer, "x", old_x, layer.x),
                     PropertyChangeCommand(layer, "y", old_y, layer.y),
                 ]))
+                if self._kind_of(layer) == "logo":
+                    self._sync_shared_logo_if_active()
         if self._resize is not None and self._selected is not None:
             kind = self._resize["kind"]
             token = self._resize["token"]
@@ -1383,11 +1401,14 @@ class App(tk.Tk):
                         PropertyChangeCommand(layer, "w", old_value, new_w),
                         PropertyChangeCommand(layer, "h", old_value, new_h),
                     ]))
+                self._sync_shared_logo_if_active()
             else:
                 new_value = self._get_layer_value(token, "size")
                 if old_value != new_value:
                     from .commands import PropertyChangeCommand
                     self.commands.push(PropertyChangeCommand(layer, "size", old_value, new_value))
+                    if self._kind_of(layer) == "logo":
+                        self._sync_shared_logo_if_active()
         self._drag_elem = None
         self._drag_start_xy = None
         self._resize = None

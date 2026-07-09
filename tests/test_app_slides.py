@@ -357,5 +357,106 @@ class TestOpenProjectSyncsSharedLogoCheckbox(unittest.TestCase):
         self.assertFalse(self.app.v_logo_shared.get())
 
 
+class TestAfterHistoryChangeReconcilesActiveSlide(unittest.TestCase):
+    """Hallazgo 1 de la revisión final: undo/redo de una operación de
+    lámina (agregar/eliminar/mover) no debe dejar self.slide apuntando a
+    un objeto huérfano ni current_slide_index fuera de rango."""
+
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._render_now = lambda: None
+        self.app._schedule_render = lambda: None
+        self.app.v_status = _FakeVar("")
+
+    def _assert_pointer_consistent(self):
+        self.assertTrue(0 <= self.app.current_slide_index < len(self.app.project.slides))
+        self.assertIs(self.app.slide, self.app.project.slides[self.app.current_slide_index])
+
+    def test_add_slide_then_undo_reconciles_pointer(self):
+        App._add_slide(self.app)
+        self.assertEqual(self.app.current_slide_index, 1)
+
+        App._undo(self.app)
+
+        self._assert_pointer_consistent()
+        self.assertEqual(len(self.app.project.slides), 2)
+
+    def test_delete_slide_then_undo_reconciles_pointer(self):
+        App._delete_slide(self.app)
+        self.assertEqual(len(self.app.project.slides), 1)
+
+        App._undo(self.app)
+
+        self._assert_pointer_consistent()
+        self.assertEqual(len(self.app.project.slides), 2)
+
+    def test_move_slide_then_undo_reconciles_pointer(self):
+        App._move_slide(self.app, 1)
+        self.assertEqual(self.app.current_slide_index, 1)
+
+        App._undo(self.app)
+
+        self._assert_pointer_consistent()
+
+
+class TestSyncSharedLogoOnDragAndResizeRelease(unittest.TestCase):
+    """Hallazgo 3 de la revisión final: con logo compartido activo, soltar
+    un drag/resize del logo debe actualizar project.shared["logo"] en vez
+    de dejarlo congelado en el snapshot viejo (lo que provocaba que el
+    logo "saltara" de vuelta a la posición anterior en el siguiente render)."""
+
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app.v_photo = _FakeVar("")
+        self.app.v_logo = _FakeVar("")
+        self.app.txt_title = _FakeText("")
+        self.app.v_sub = _FakeVar("")
+        self.app.txt_desc = _FakeText("")
+        self.app.v_icon = _FakeVar("planta")
+        self.app.v_logo_shared = _FakeVar(False)
+        self.app._set_dirty = lambda value: None
+        self.app._schedule_render = lambda: None
+        self.app._render_now = lambda: None
+
+        self.app.v_logo_shared.set(True)
+        App._toggle_shared_logo(self.app)
+
+    def test_release_after_drag_updates_shared_logo_snapshot(self):
+        logo_layer = App._layer_by_kind(self.app, "logo")
+        self.app._selected = logo_layer
+        self.app._drag_elem = App._token_for_layer(self.app, logo_layer)
+        self.app._drag_start_xy = (logo_layer.x, logo_layer.y)
+        self.app._resize = None
+
+        logo_layer.x = 0.42
+        logo_layer.y = 0.13
+
+        App._on_release(self.app, event=None)
+
+        self.assertEqual(self.app.project.shared["logo"]["x"], 0.42)
+        self.assertEqual(self.app.project.shared["logo"]["y"], 0.13)
+
+    def test_release_after_resize_updates_shared_logo_snapshot(self):
+        logo_layer = App._layer_by_kind(self.app, "logo")
+        self.app._selected = logo_layer
+        self.app._drag_elem = None
+        self.app._drag_start_xy = None
+        token = App._token_for_layer(self.app, logo_layer)
+        self.app._resize = {"kind": "logo", "token": token, "start_value": logo_layer.w}
+
+        logo_layer.w = 0.35
+        logo_layer.h = 0.35
+
+        App._on_release(self.app, event=None)
+
+        self.assertEqual(self.app.project.shared["logo"]["w"], 0.35)
+
+
 if __name__ == "__main__":
     unittest.main()
