@@ -1,9 +1,8 @@
-# Progreso — Tarea 1.5 (PropertyPanel dinámico)
+# Progreso — Tareas 1.6-1.9
 
-Plan: docs/superpowers/plans/2026-07-08-fase1-tarea1.5-property-panel.md
+Plan: docs/superpowers/plans/2026-07-08-fase1-tareas-1.6-1.9.md
 
-- Task 1 (opacidad en render.py): complete (commits 08d445a..86f7df5, review clean tras 3 rondas de fix)
-- Task 2 (panel dinamico en app.py): complete (commits 3b803a1..5fe6555, review clean)
-- Revision final de rama: APROBADA (Ready to merge: Yes)
-
-Listo para merge.
+- Tarea 1 (panel de capas): pendiente
+- Tarea 2 (undo/redo): pendiente
+- Tarea 3 (guardar/abrir proyecto): pendiente
+- Tarea 4 (exportar): pendiente
