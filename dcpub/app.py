@@ -1437,6 +1437,7 @@ class App(tk.Tk):
         self.commands.clear()
         self._selected = None
 
+        self.v_logo_shared.set("logo" in self.project.shared)
         self._sync_widgets_from_slide()
 
         self._set_dirty(False)

@@ -1,6 +1,7 @@
 """Tests de estado de lámina activa en dcpub.app.App (sin abrir Tk)."""
 
 import unittest
+from unittest.mock import patch
 
 from dcpub.app import App
 from dcpub.models import crear_proyecto_por_defecto
@@ -316,6 +317,44 @@ class TestSharedLogo(unittest.TestCase):
         capas = App._build_layers_for(self.app, segunda)
         logo = next(c for c in capas if c["type"] == "logo")
         self.assertEqual(logo["src"], logo_propio.src)
+
+
+class TestOpenProjectSyncsSharedLogoCheckbox(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app.v_logo_shared = _FakeVar(False)
+        self.app._confirm_discard_changes = lambda: True
+        self.app._sync_widgets_from_slide = lambda: None
+        self.app._set_dirty = lambda value: None
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+        self.app.v_status = _FakeVar("")
+
+    def _open_with_project(self, proyecto):
+        with patch("dcpub.app.filedialog.askopenfilename", return_value="proyecto.json"), \
+             patch("dcpub.project_io.load_project", return_value=proyecto):
+            App._open_project(self.app)
+
+    def test_checkbox_is_checked_when_loaded_project_has_shared_logo(self):
+        proyecto = crear_proyecto_por_defecto("foto1.jpg")
+        proyecto.shared["logo"] = {"src": "logo-compartido.png"}
+
+        self._open_with_project(proyecto)
+
+        self.assertTrue(self.app.v_logo_shared.get())
+
+    def test_checkbox_is_unchecked_when_loaded_project_has_no_shared_logo(self):
+        self.app.v_logo_shared = _FakeVar(True)
+        proyecto = crear_proyecto_por_defecto("foto1.jpg")
+        proyecto.shared.pop("logo", None)
+
+        self._open_with_project(proyecto)
+
+        self.assertFalse(self.app.v_logo_shared.get())
 
 
 if __name__ == "__main__":
