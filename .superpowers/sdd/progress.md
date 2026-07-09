@@ -94,3 +94,6 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
     asserts direccionales (>0/<0) en vez de valores exactos calculables a mano, tal como
     los especifica el plan verbatim. No es negligencia del implementador.
 - Tarea 7 (drag para panear en canvas): complete (commit 55889c5..45d4acc, review clean, 211 tests)
+- Tarea 8 (zoom con rueda del mouse): complete (commit e9d8dba..60d20ea, fix aplicado y re-revisado,
+  216 tests). Hallazgo Important corregido: faltaba test del colapso de undo en burst de rueda; se
+  agrego test que llama _commit_wheel_zoom directo y verifica un solo PropertyChangeCommand.
