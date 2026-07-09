@@ -10,7 +10,7 @@ from PIL import Image, ImageTk
 
 from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS, FORMATOS
 from .fonts import FontManager
-from .models import crear_proyecto_por_defecto
+from .models import crear_proyecto_por_defecto, _short_id
 from .render import compose
 
 DARK = "#1e1e1e"
@@ -193,6 +193,13 @@ class App(tk.Tk):
         cb_formato.pack(fill=tk.X, pady=(2, 10), **pad)
         cb_formato.bind("<<ComboboxSelected>>", lambda e: self._on_format_change())
 
+        # Capas
+        tk.Label(left, text="📚  Capas", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
+        self._layers_list_frame = tk.Frame(left, bg=PANEL)
+        self._layers_list_frame.pack(fill=tk.X, pady=(0, 10), **pad)
+        self._refresh_layers_list()
+
         # Foto
         tk.Label(left, text="📷  Foto", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", **pad)
@@ -292,6 +299,126 @@ class App(tk.Tk):
                   command=self._reset).pack(fill=tk.X, padx=16, pady=(12, 16))
 
         self._build_property_panel()
+
+    def _refresh_layers_list(self):
+        """Reconstruye la lista de capas del panel izquierdo, ordenada de mayor
+        a menor z (la capa que se dibuja al frente aparece primero)."""
+        for w in self._layers_list_frame.winfo_children():
+            w.destroy()
+
+        layers_by_z = sorted(self.slide.layers, key=lambda l: l.z, reverse=True)
+        for layer in layers_by_z:
+            self._build_layer_row(self._layers_list_frame, layer)
+
+    def _build_layer_row(self, parent, layer):
+        is_selected = layer is self._selected
+        row_bg = "#3a4a2f" if is_selected else PANEL
+        row = tk.Frame(parent, bg=row_bg)
+        row.pack(fill=tk.X, pady=1)
+
+        visible_icon = "👁" if layer.visible else "🙈"
+        tk.Button(row, text=visible_icon, bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), width=2,
+                  command=lambda l=layer: self._toggle_layer_visible(l)).pack(side=tk.LEFT)
+
+        lock_icon = "🔒" if layer.locked else "🔓"
+        tk.Button(row, text=lock_icon, bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), width=2,
+                  command=lambda l=layer: self._toggle_layer_locked(l)).pack(side=tk.LEFT)
+
+        name_label = tk.Label(row, text=layer.name, bg=row_bg, fg=TEXT,
+                               font=("Segoe UI", 8), anchor="w")
+        name_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 2))
+        name_label.bind("<Button-1>", lambda e, l=layer: self._set_selected(l))
+        name_label.bind("<Double-Button-1>", lambda e, l=layer, lbl=name_label:
+                         self._start_rename(l, lbl, row))
+
+        tk.Button(row, text="▲", bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 7), width=2,
+                  command=lambda l=layer: self._move_layer_z(l, 1)).pack(side=tk.LEFT)
+        tk.Button(row, text="▼", bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 7), width=2,
+                  command=lambda l=layer: self._move_layer_z(l, -1)).pack(side=tk.LEFT)
+        tk.Button(row, text="⧉", bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), width=2,
+                  command=lambda l=layer: self._duplicate_layer(l)).pack(side=tk.LEFT)
+        tk.Button(row, text="🗑", bg=row_bg, fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), width=2,
+                  command=lambda l=layer: self._delete_layer(l)).pack(side=tk.LEFT)
+
+    def _start_rename(self, layer, label_widget, row):
+        entry_var = tk.StringVar(value=layer.name)
+        entry = tk.Entry(row, textvariable=entry_var, bg=FIELD, fg=TEXT,
+                          insertbackground=TEXT, relief="flat", bd=2,
+                          font=("Segoe UI", 8))
+        label_widget.pack_forget()
+        entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 2))
+        entry.focus_set()
+        entry.select_range(0, tk.END)
+
+        def _commit(_event=None):
+            new_name = entry_var.get().strip()
+            if new_name:
+                self._rename_layer(layer, new_name)
+            else:
+                self._refresh_layers_list()
+
+        entry.bind("<Return>", _commit)
+        entry.bind("<FocusOut>", _commit)
+        entry.bind("<Escape>", lambda e: self._refresh_layers_list())
+
+    def _toggle_layer_visible(self, layer):
+        # TODO Tarea 2: envolver en Command
+        layer.visible = not layer.visible
+        self._refresh_layers_list()
+        if layer is self._selected:
+            self._build_property_panel()
+        self._schedule_render()
+
+    def _toggle_layer_locked(self, layer):
+        # TODO Tarea 2: envolver en Command
+        layer.locked = not layer.locked
+        self._refresh_layers_list()
+        if layer is self._selected:
+            self._build_property_panel()
+        self._schedule_render()
+
+    def _move_layer_z(self, layer, direction):
+        # TODO Tarea 2: envolver en Command
+        layers_by_z = sorted(self.slide.layers, key=lambda l: l.z, reverse=True)
+        idx = layers_by_z.index(layer)
+        swap_idx = idx - direction
+        if swap_idx < 0 or swap_idx >= len(layers_by_z):
+            return
+        other = layers_by_z[swap_idx]
+        layer.z, other.z = other.z, layer.z
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _duplicate_layer(self, layer):
+        # TODO Tarea 2: envolver en Command
+        import dataclasses
+        new_layer = dataclasses.replace(layer)
+        new_layer.id = _short_id()
+        new_layer.name = layer.name + " (copia)"
+        new_layer.z = max((l.z for l in self.slide.layers), default=0) + 1
+        self.slide.layers.append(new_layer)
+        self._set_selected(new_layer)
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _delete_layer(self, layer):
+        # TODO Tarea 2: envolver en Command
+        self.slide.layers.remove(layer)
+        if layer is self._selected:
+            self._set_selected(None)
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _rename_layer(self, layer, new_name):
+        # TODO Tarea 2: envolver en Command
+        layer.name = new_name
+        self._refresh_layers_list()
 
     def _build_property_panel(self):
         """Reconstruye el contenido del panel derecho según la capa seleccionada."""
@@ -533,6 +660,7 @@ class App(tk.Tk):
     def _set_selected(self, layer):
         self._selected = layer
         self._build_property_panel()
+        self._refresh_layers_list()
         self._render_now()
 
     def _update_readout(self):
