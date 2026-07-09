@@ -45,6 +45,18 @@ class TestCompose(unittest.TestCase):
         self.assertIn("sub", bboxes)
         self.assertIn("desc", bboxes)
 
+    def test_compose_uses_optional_layer_key_for_bbox(self):
+        layers = [
+            {"type": "photo", "key": "foto_base", "src": str(self.photo_path)},
+            {"type": "title", "key": "titulo_copia", "text": "Texto",
+             "x": 0.055, "y": 0.42, "size": 0.087},
+        ]
+        img, bboxes = compose(layers, (400, 500), self.font_manager)
+        self.assertIn("foto_base", bboxes)
+        self.assertIn("titulo_copia", bboxes)
+        self.assertNotIn("photo", bboxes)
+        self.assertNotIn("title", bboxes)
+
     def test_photo_bbox_covers_full_canvas(self):
         img, bboxes = compose(self._layers(), (400, 500), self.font_manager)
         self.assertEqual(bboxes["photo"], (0, 0, 400, 500))

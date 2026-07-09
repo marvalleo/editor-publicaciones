@@ -121,7 +121,8 @@ def compose(layers, canvas_size, font_manager):
     canvas_size : (ancho, alto) en px del lienzo final.
     font_manager : instancia de FontManager para cargar las fuentes por rol.
 
-    Devuelve (imagen RGBA, bboxes) donde bboxes[type] = (x0,y0,x1,y1) en px.
+    Devuelve (imagen RGBA, bboxes) donde bboxes[key] = (x0,y0,x1,y1) en px.
+    Si la capa no trae "key", se usa su "type" para mantener compatibilidad.
     Las capas con texto vacío/blanco no producen bbox. Si no hay capa "photo",
     el lienzo queda transparente (del tamaño pedido) en vez de fallar.
     """
@@ -134,6 +135,7 @@ def compose(layers, canvas_size, font_manager):
 
     for layer in layers:
         kind = layer["type"]
+        bbox_key = layer.get("key", kind)
         opacity = layer.get("opacity", 1.0)
 
         if kind == "photo":
@@ -151,7 +153,7 @@ def compose(layers, canvas_size, font_manager):
             else:
                 canvas = bg
             draw = ImageDraw.Draw(canvas)
-            bboxes["photo"] = (0, 0, W, H)
+            bboxes[bbox_key] = (0, 0, W, H)
 
         elif kind == "logo":
             if not LOGO_FILE.exists():
@@ -166,7 +168,7 @@ def compose(layers, canvas_size, font_manager):
                 lx = int(layer["x"] * W)
                 ly = int(layer["y"] * H)
                 canvas.alpha_composite(logo, (lx, ly))
-                bboxes["logo"] = (lx, ly, lx + lsz, ly + lsz)
+                bboxes[bbox_key] = (lx, ly, lx + lsz, ly + lsz)
             except Exception:
                 pass
 
@@ -205,7 +207,7 @@ def compose(layers, canvas_size, font_manager):
                         draw.text((tx, yy), line, font=font_t, fill=text_color)
                         bb = draw.textbbox((tx, yy), line, font=font_t)
                         widest = max(widest, bb[2] - tx)
-                bboxes["title"] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
+                bboxes[bbox_key] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
 
         elif kind == "sub":
             subtitle = layer["text"]
@@ -242,7 +244,7 @@ def compose(layers, canvas_size, font_manager):
                     draw.text((sx + 2, sy + 2), subtitle, font=font_s,
                               fill=_apply_opacity((0, 0, 0, 130), opacity))
                     draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                bboxes["sub"] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
+                bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
         elif kind == "desc":
             description = layer["text"]
@@ -294,6 +296,6 @@ def compose(layers, canvas_size, font_manager):
                 canvas = Image.alpha_composite(canvas, text_layer)
                 draw = ImageDraw.Draw(canvas)
 
-                bboxes["desc"] = (bx, by, bx + box_w, by + box_h)
+                bboxes[bbox_key] = (bx, by, bx + box_w, by + box_h)
 
     return canvas, bboxes

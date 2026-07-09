@@ -479,6 +479,7 @@ class App(tk.Tk):
         kind = self._kind_of(layer)
         if kind is None:
             return
+        token = self._token_for_layer(layer)
 
         card = tk.Frame(self._props_body, bg=PANEL, padx=12, pady=8)
         card.pack(fill=tk.X, padx=12, pady=5)
@@ -498,25 +499,25 @@ class App(tk.Tk):
                   font=("Segoe UI", 8), command=self._toggle_locked).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(3, 0))
 
-        self.ctrl[kind] = {}
+        self.ctrl[token] = {}
         disabled = layer.locked
 
         if kind == "photo":
-            self._slider(card, kind, "zoom", "Zoom", 1.0, 3.0, disabled=disabled)
-            self._slider(card, kind, "offset_x", "Posición X del recorte", 0.0, 1.0,
+            self._slider(card, token, "zoom", "Zoom", 1.0, 3.0, disabled=disabled)
+            self._slider(card, token, "offset_x", "Posición X del recorte", 0.0, 1.0,
                          disabled=disabled)
-            self._slider(card, kind, "offset_y", "Posición Y del recorte", 0.0, 1.0,
+            self._slider(card, token, "offset_y", "Posición Y del recorte", 0.0, 1.0,
                          disabled=disabled)
-            self._slider(card, kind, "opacity", "Opacidad", 0.0, 1.0,
+            self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                          disabled=disabled, as_percent=True)
             return
 
         smin, smax = SIZE_RANGE[kind]
         size_label = "Tamaño del logo" if kind == "logo" else "Tamaño de fuente"
-        self._slider(card, kind, "x", "Posición X", 0.0, 1.0, disabled=disabled)
-        self._slider(card, kind, "y", "Posición Y", 0.0, 1.0, disabled=disabled)
-        self._slider(card, kind, "size", size_label, smin, smax, disabled=disabled)
-        self._slider(card, kind, "opacity", "Opacidad", 0.0, 1.0,
+        self._slider(card, token, "x", "Posición X", 0.0, 1.0, disabled=disabled)
+        self._slider(card, token, "y", "Posición Y", 0.0, 1.0, disabled=disabled)
+        self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
+        self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
 
         align_row = tk.Frame(card, bg=PANEL)
@@ -586,9 +587,10 @@ class App(tk.Tk):
 
         old_value = self._get_layer_value(elem, param)
         if old_value != value:
-            layer = self._layer_by_kind(elem)
+            layer = self._layer_by_token(elem)
+            kind = self._kind_of(layer)
             from .commands import PropertyChangeCommand, CompositeCommand
-            if elem == "logo" and param == "size":
+            if kind == "logo" and param == "size":
                 self.commands.push(CompositeCommand([
                     PropertyChangeCommand(layer, "w", old_value, value),
                     PropertyChangeCommand(layer, "h", old_value, value),
@@ -623,7 +625,7 @@ class App(tk.Tk):
         if self._selected is None or self._selected.locked:
             return
         kind = self._kind_of(self._selected)
-        bb = self._last_bboxes.get(kind)
+        bb = self._last_bboxes.get(self._bbox_key_for_layer(self._selected))
         if not bb:
             return
         iw, ih = self._img_wh
@@ -672,21 +674,42 @@ class App(tk.Tk):
         return None
 
     def _kind_of(self, layer):
-        """Inverso de _layer_by_kind: dado un Layer, devuelve su "kind" de render."""
-        for kind in ["photo"] + ELEMENTS:
-            if self._layer_by_kind(kind) is layer:
-                return kind
+        """Dado un Layer, devuelve su tipo visual para render/propiedades."""
+        if layer is None:
+            return None
+        if layer.type == "photo":
+            return "photo"
+        if layer.type == "logo":
+            return "logo"
+        if layer.type == "text" and layer.role == "title":
+            return "title"
+        if layer.type == "text" and layer.role == "subtitle":
+            return "sub"
+        if layer.type == "box":
+            return "desc"
         return None
 
+    def _token_for_layer(self, layer):
+        return layer.id
+
+    def _layer_by_token(self, token):
+        for layer in self.slide.layers:
+            if layer.id == token:
+                return layer
+        return self._layer_by_kind(token)
+
+    def _bbox_key_for_layer(self, layer):
+        return layer.id
+
     def _get_layer_value(self, elem, param):
-        layer = self._layer_by_kind(elem)
-        if elem == "logo" and param == "size":
+        layer = self._layer_by_token(elem)
+        if self._kind_of(layer) == "logo" and param == "size":
             return layer.w
         return getattr(layer, param)
 
     def _set_layer_value(self, elem, param, value):
-        layer = self._layer_by_kind(elem)
-        if elem == "logo" and param == "size":
+        layer = self._layer_by_token(elem)
+        if self._kind_of(layer) == "logo" and param == "size":
             layer.w = value
             layer.h = value
         else:
@@ -711,8 +734,9 @@ class App(tk.Tk):
             return
         old_value = self._slider_start_value
         self._slider_start_value = None
-        layer = self._layer_by_kind(elem)
-        if elem == "logo" and param == "size":
+        layer = self._layer_by_token(elem)
+        kind = self._kind_of(layer)
+        if kind == "logo" and param == "size":
             new_w, new_h = layer.w, layer.h
             if (old_value, old_value) != (new_w, new_h):
                 from .commands import PropertyChangeCommand, CompositeCommand
@@ -730,16 +754,16 @@ class App(tk.Tk):
         """Refleja el estado actual en los controles del panel activo, sin disparar render."""
         if self._selected is None:
             return
-        kind = self._kind_of(self._selected)
-        if kind is None or kind not in self.ctrl:
+        token = self._token_for_layer(self._selected)
+        if token not in self.ctrl:
             return
         self._updating = True
-        for param, var in list(self.ctrl[kind].items()):
+        for param, var in list(self.ctrl[token].items()):
             if param.endswith("_entry"):
                 continue
-            value = self._get_layer_value(kind, param)
+            value = self._get_layer_value(token, param)
             var.set(value)
-            entry_var = self.ctrl[kind].get(param + "_entry")
+            entry_var = self.ctrl[token].get(param + "_entry")
             if entry_var is not None:
                 entry_var.set(self._format_value(value, param == "opacity"))
         self._updating = False
@@ -836,7 +860,7 @@ class App(tk.Tk):
         kind = self._kind_of(self._selected)
         if kind is None or kind == "photo":
             return
-        bb = self._last_bboxes.get(kind)
+        bb = self._last_bboxes.get(self._bbox_key_for_layer(self._selected))
         if not bb:
             return
         ox, oy = self._img_origin
@@ -876,7 +900,8 @@ class App(tk.Tk):
 
     def _start_resize(self, event):
         kind = self._kind_of(self._selected)
-        bb = self._last_bboxes.get(kind)
+        token = self._token_for_layer(self._selected)
+        bb = self._last_bboxes.get(self._bbox_key_for_layer(self._selected))
         if not bb:
             return
         x0, y0, x1, y1 = bb
@@ -885,20 +910,22 @@ class App(tk.Tk):
         start_dist = max(1.0, ((ix - cx_img) ** 2 + (iy - cy_img) ** 2) ** 0.5)
         self._resize = {
             "kind": kind,
+            "token": token,
             "center": (cx_img, cy_img),
             "start_dist": start_dist,
-            "start_value": self._get_layer_value(kind, "size"),
+            "start_value": self._get_layer_value(token, "size"),
         }
 
     def _apply_resize(self, event):
         kind = self._resize["kind"]
+        token = self._resize["token"]
         cx_img, cy_img = self._resize["center"]
         ix, iy = self._canvas_to_img(event.x, event.y)
         dist = max(1.0, ((ix - cx_img) ** 2 + (iy - cy_img) ** 2) ** 0.5)
         ratio = dist / self._resize["start_dist"]
         smin, smax = SIZE_RANGE[kind]
         new_value = min(smax, max(smin, self._resize["start_value"] * ratio))
-        self._set_layer_value(kind, "size", new_value)
+        self._set_layer_value(token, "size", new_value)
         self._sync_sliders()
         self._render_now()
 
@@ -988,23 +1015,31 @@ class App(tk.Tk):
             if not layer.visible:
                 continue
             if layer.type == "photo":
-                layers.append({"type": "photo", "src": self.v_photo.get().strip(),
+                src = self.v_photo.get().strip() if layer is self._layer_by_kind("photo") else layer.src
+                layers.append({"type": "photo", "key": layer.id, "src": src,
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
                                 "offset_y": layer.offset_y, "opacity": layer.opacity})
             elif layer.type == "logo":
-                layers.append({"type": "logo", "x": layer.x, "y": layer.y, "size": layer.w,
+                layers.append({"type": "logo", "key": layer.id,
+                                "x": layer.x, "y": layer.y, "size": layer.w,
                                 "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "title":
-                layers.append({"type": "title", "text": self.txt_title.get("1.0", "end-1c"),
+                text = (self.txt_title.get("1.0", "end-1c")
+                        if layer is self._layer_by_kind("title") else layer.text)
+                layers.append({"type": "title", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "subtitle":
-                layers.append({"type": "sub", "text": self.v_sub.get(),
+                text = self.v_sub.get() if layer is self._layer_by_kind("sub") else layer.text
+                layers.append({"type": "sub", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "box":
-                layers.append({"type": "desc", "text": self.txt_desc.get("1.0", "end-1c"),
-                                "icon": self.v_icon.get(), "x": layer.x, "y": layer.y,
+                text = (self.txt_desc.get("1.0", "end-1c")
+                        if layer is self._layer_by_kind("desc") else layer.text)
+                icon = self.v_icon.get() if layer is self._layer_by_kind("desc") else layer.icon
+                layers.append({"type": "desc", "key": layer.id, "text": text,
+                                "icon": icon, "x": layer.x, "y": layer.y,
                                 "size": layer.size, "opacity": layer.opacity})
         return layers
 
@@ -1060,13 +1095,13 @@ class App(tk.Tk):
                 return
 
         ix, iy = self._canvas_to_img(event.x, event.y)
-        for elem in reversed(ELEMENTS):
-            layer = self._layer_by_kind(elem)
-            if layer is None or layer.locked:
+        for layer in sorted(self.slide.layers, key=lambda l: l.z, reverse=True):
+            kind = self._kind_of(layer)
+            if kind is None or kind == "photo" or layer.locked or not layer.visible:
                 continue
-            bb = self._last_bboxes.get(elem)
+            bb = self._last_bboxes.get(self._bbox_key_for_layer(layer))
             if bb and bb[0] <= ix <= bb[2] and bb[1] <= iy <= bb[3]:
-                self._drag_elem = elem
+                self._drag_elem = self._token_for_layer(layer)
                 self._drag_off = (ix - bb[0], iy - bb[1])
                 self._drag_start_xy = (layer.x, layer.y)
                 self._set_selected(layer)
@@ -1074,7 +1109,8 @@ class App(tk.Tk):
 
         self._drag_elem = None
         photo_layer = self._layer_by_kind("photo")
-        bb_photo = self._last_bboxes.get("photo")
+        bb_photo = (self._last_bboxes.get(self._bbox_key_for_layer(photo_layer))
+                    if photo_layer is not None else None)
         if (photo_layer is not None and not photo_layer.locked and bb_photo
                 and bb_photo[0] <= ix <= bb_photo[2] and bb_photo[1] <= iy <= bb_photo[3]):
             self._set_selected(photo_layer)
@@ -1088,6 +1124,8 @@ class App(tk.Tk):
         if not self._drag_elem:
             return
         elem = self._drag_elem
+        layer = self._layer_by_token(elem)
+        kind = self._kind_of(layer)
         iw, ih = self._img_wh
         if iw == 0 or ih == 0:
             return
@@ -1100,8 +1138,7 @@ class App(tk.Tk):
         bh = (bb[3] - bb[1]) if bb else 0
         new_x0, new_y0, self._guides = _snap_position(new_x0, new_y0, bw, bh, iw, ih)
 
-        layer = self._layer_by_kind(elem)
-        if elem == "sub":
+        if kind == "sub":
             half_w = bw / 2
             cx = new_x0 + half_w
             layer.x = min(1.0, max(0.0, cx / iw))
@@ -1125,7 +1162,8 @@ class App(tk.Tk):
                 ]))
         if self._resize is not None and self._selected is not None:
             kind = self._resize["kind"]
-            layer = self._layer_by_kind(kind)
+            token = self._resize["token"]
+            layer = self._layer_by_token(token)
             old_value = self._resize["start_value"]
             if kind == "logo":
                 new_w, new_h = layer.w, layer.h
@@ -1136,7 +1174,7 @@ class App(tk.Tk):
                         PropertyChangeCommand(layer, "h", old_value, new_h),
                     ]))
             else:
-                new_value = self._get_layer_value(kind, "size")
+                new_value = self._get_layer_value(token, "size")
                 if old_value != new_value:
                     from .commands import PropertyChangeCommand
                     self.commands.push(PropertyChangeCommand(layer, "size", old_value, new_value))
