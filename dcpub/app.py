@@ -686,6 +686,8 @@ class App(tk.Tk):
                 PropertyChangeCommand(layer, "x", old_x, final_x),
                 PropertyChangeCommand(layer, "y", old_y, final_y),
             ]))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
 
         self._sync_sliders()
         self._render_now()
@@ -1134,6 +1136,8 @@ class App(tk.Tk):
                 PropertyChangeCommand(layer, "x", old_x, new_x),
                 PropertyChangeCommand(layer, "y", old_y, new_y),
             ]))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
         self._sync_sliders()
         self._render_now()
 

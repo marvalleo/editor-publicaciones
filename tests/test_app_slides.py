@@ -458,5 +458,53 @@ class TestSyncSharedLogoOnDragAndResizeRelease(unittest.TestCase):
         self.assertEqual(self.app.project.shared["logo"]["w"], 0.35)
 
 
+class TestSyncSharedLogoOnNudgeAndCenter(unittest.TestCase):
+    """Re-revisión del Hallazgo 3: el fix anterior cubrió drag/resize/slider,
+    pero _nudge (flechas del teclado) y _center_selected (botones Centrar)
+    también mueven x/y del logo sin sincronizar project.shared["logo"],
+    provocando el mismo "salto" visual en el siguiente render."""
+
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app.v_photo = _FakeVar("")
+        self.app.v_logo = _FakeVar("")
+        self.app.txt_title = _FakeText("")
+        self.app.v_sub = _FakeVar("")
+        self.app.txt_desc = _FakeText("")
+        self.app.v_icon = _FakeVar("planta")
+        self.app.v_logo_shared = _FakeVar(False)
+        self.app._set_dirty = lambda value: None
+        self.app._schedule_render = lambda: None
+        self.app._render_now = lambda: None
+        self.app._sync_sliders = lambda: None
+        self.app.focus_get = lambda: None
+
+        self.app.v_logo_shared.set(True)
+        App._toggle_shared_logo(self.app)
+
+    def test_nudge_updates_shared_logo_snapshot(self):
+        logo_layer = App._layer_by_kind(self.app, "logo")
+        self.app._selected = logo_layer
+
+        App._nudge(self.app, 1, 0, 0.01)
+
+        self.assertEqual(self.app.project.shared["logo"]["x"], logo_layer.x)
+        self.assertEqual(self.app.project.shared["logo"]["y"], logo_layer.y)
+
+    def test_center_selected_updates_shared_logo_snapshot(self):
+        logo_layer = App._layer_by_kind(self.app, "logo")
+        self.app._selected = logo_layer
+        self.app._img_wh = (1080, 1350)
+        bbox_key = App._bbox_key_for_layer(self.app, logo_layer)
+        self.app._last_bboxes = {bbox_key: (100, 100, 300, 300)}
+
+        App._center_selected(self.app, "x")
+
+        self.assertEqual(self.app.project.shared["logo"]["x"], logo_layer.x)
+        self.assertEqual(self.app.project.shared["logo"]["y"], logo_layer.y)
+
+
 if __name__ == "__main__":
     unittest.main()
