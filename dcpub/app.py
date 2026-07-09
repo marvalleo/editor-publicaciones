@@ -936,6 +936,7 @@ class App(tk.Tk):
             if bb and bb[0] <= ix <= bb[2] and bb[1] <= iy <= bb[3]:
                 self._drag_elem = elem
                 self._drag_off = (ix - bb[0], iy - bb[1])
+                self._drag_start_xy = (layer.x, layer.y)
                 self._set_selected(layer)
                 return
 
@@ -981,7 +982,34 @@ class App(tk.Tk):
         self._render_now()
 
     def _on_release(self, event):
+        if self._drag_elem and self._drag_start_xy is not None and self._selected is not None:
+            old_x, old_y = self._drag_start_xy
+            layer = self._selected
+            if (layer.x, layer.y) != (old_x, old_y):
+                from .commands import PropertyChangeCommand, CompositeCommand
+                self.commands.push(CompositeCommand([
+                    PropertyChangeCommand(layer, "x", old_x, layer.x),
+                    PropertyChangeCommand(layer, "y", old_y, layer.y),
+                ]))
+        if self._resize is not None and self._selected is not None:
+            kind = self._resize["kind"]
+            layer = self._layer_by_kind(kind)
+            old_value = self._resize["start_value"]
+            if kind == "logo":
+                new_w, new_h = layer.w, layer.h
+                if (old_value, old_value) != (new_w, new_h):
+                    from .commands import PropertyChangeCommand, CompositeCommand
+                    self.commands.push(CompositeCommand([
+                        PropertyChangeCommand(layer, "w", old_value, new_w),
+                        PropertyChangeCommand(layer, "h", old_value, new_h),
+                    ]))
+            else:
+                new_value = self._get_layer_value(kind, "size")
+                if old_value != new_value:
+                    from .commands import PropertyChangeCommand
+                    self.commands.push(PropertyChangeCommand(layer, "size", old_value, new_value))
         self._drag_elem = None
+        self._drag_start_xy = None
         self._resize = None
         self._guides = []
         self._render_now()
