@@ -438,7 +438,7 @@ def compose(layers, canvas_size, font_manager, palette=None):
             if description.strip():
                 bsz = max(8, int(W * layer["size"]))
                 font_b = font_manager.load("body", bsz)
-                box_w = int(W * 0.90)
+                box_w = int(W * layer.get("w", 0)) or int(W * 0.90)
                 bx = int(layer["x"] * W)
                 by = int(layer["y"] * H)
                 bx = max(0, min(bx, W - box_w))
@@ -455,18 +455,21 @@ def compose(layers, canvas_size, font_manager, palette=None):
                 dlines = wrap_text(description, font_b, max(10, text_w), draw)
                 dlh = int(bsz * 1.48)
                 text_h = len(dlines) * dlh
-                box_h = max(text_h + pad, icon_sz + pad) + int(H * 0.010)
+                auto_box_h = max(text_h + pad, icon_sz + pad) + int(H * 0.010)
+                box_h = int(H * layer.get("h", 0)) or auto_box_h
 
                 box_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
                 bd = ImageDraw.Draw(box_layer)
-                box_fill = _apply_opacity(BOX_COLOR, opacity)
+                fill_color = layer.get("fill", BOX_COLOR)
+                box_fill = _apply_opacity(fill_color, opacity)
                 bd.rounded_rectangle([(bx, by), (bx + box_w, by + box_h)],
                                      radius=corner_r, fill=box_fill)
                 canvas = Image.alpha_composite(canvas, box_layer)
                 draw = ImageDraw.Draw(canvas)
 
                 icon_color = _apply_opacity(VERDE, opacity)
-                text_color = _apply_opacity(BLANCO + (255,), opacity)
+                text_color_value = layer.get("text_color", BLANCO + (255,))
+                text_color = _apply_opacity(text_color_value, opacity)
                 if icon != "ninguno":
                     iy = by + (box_h - icon_sz) // 2
                     icon_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))

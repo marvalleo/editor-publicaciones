@@ -386,5 +386,58 @@ class TestExcessForZoom(unittest.TestCase):
         self.assertGreater(excess_x, 0)
 
 
+class TestDescBoxConfigurable(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "desc", "key": "desc", "text": "Una descripción de prueba",
+                "icon": "ninguno", "x": 0.1, "y": 0.1, "size": 0.03, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_custom_width_changes_box_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, bboxes_default = compose([self._layer(w=0.90)], (1000, 1000), fm)
+        img_narrow, bboxes_narrow = compose([self._layer(w=0.30)], (1000, 1000), fm)
+        self.assertNotEqual(bboxes_default["desc"][2], bboxes_narrow["desc"][2])
+
+    def test_zero_width_falls_back_to_legacy_90_percent(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer(w=0.0)], (1000, 1000), fm)
+        x0, y0, x1, y1 = bboxes["desc"]
+        self.assertEqual(x1 - x0, int(1000 * 0.90))
+
+    def test_custom_height_changes_box_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes_tall = compose([self._layer(w=0.90, h=0.30)], (1000, 1000), fm)
+        _, bboxes_default = compose([self._layer(w=0.90, h=0.0)], (1000, 1000), fm)
+        x0a, y0a, x1a, y1a = bboxes_tall["desc"]
+        x0b, y0b, x1b, y1b = bboxes_default["desc"]
+        self.assertGreater(y1a - y0a, y1b - y0b)
+
+    def test_custom_fill_changes_box_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, _ = compose([self._layer(w=0.90, h=0.15, fill=[40, 25, 15, 215])],
+                                  (400, 400), fm)
+        img_custom, _ = compose([self._layer(w=0.90, h=0.15, fill=[0, 200, 0, 255])],
+                                 (400, 400), fm)
+        self.assertNotEqual(list(img_default.getdata()), list(img_custom.getdata()))
+
+    def test_custom_text_color_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_white, _ = compose(
+            [self._layer(w=0.90, h=0.15, text_color=[255, 255, 255, 255])], (400, 400), fm)
+        img_red, _ = compose(
+            [self._layer(w=0.90, h=0.15, text_color=[255, 0, 0, 255])], (400, 400), fm)
+        self.assertNotEqual(list(img_white.getdata()), list(img_red.getdata()))
+
+
 if __name__ == "__main__":
     unittest.main()
