@@ -87,3 +87,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
 - Tarea 1 (fix adjust/overlay no llegaban al render): complete (commit 5dd7835..e135b9e, review clean, 190 tests)
 - Tarea 2 (rangos/etiquetas de ajuste): complete (commit 813d923..81603eb, review clean, 193 tests)
 - Tarea 3 (DictItemChangeCommand): complete (commit 9cc639c..fe72361, review clean, 196 tests)
+- Tarea 4 (params anidados en sliders/undo): complete (commit cd060d0..602edf4, review clean, 200 tests)
