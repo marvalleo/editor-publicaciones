@@ -117,6 +117,7 @@ class App(tk.Tk):
         self._drag_elem = None
         self._drag_off = (0, 0)
         self._drag_start_xy = None
+        self._slider_start_value = None
         self._last_bboxes = {}
         self._img_wh = (0, 0)        # tamaño en px de la imagen mostrada
         self._selected = None        # Layer seleccionada actualmente, o None
@@ -376,56 +377,61 @@ class App(tk.Tk):
         entry.bind("<Escape>", lambda e: self._refresh_layers_list())
 
     def _toggle_layer_visible(self, layer):
-        # TODO Tarea 2: envolver en Command
-        layer.visible = not layer.visible
+        from .commands import PropertyChangeCommand
+        old_value = layer.visible
+        self.commands.push(PropertyChangeCommand(layer, "visible", old_value, not old_value))
         self._refresh_layers_list()
         if layer is self._selected:
             self._build_property_panel()
         self._schedule_render()
 
     def _toggle_layer_locked(self, layer):
-        # TODO Tarea 2: envolver en Command
-        layer.locked = not layer.locked
+        from .commands import PropertyChangeCommand
+        old_value = layer.locked
+        self.commands.push(PropertyChangeCommand(layer, "locked", old_value, not old_value))
         self._refresh_layers_list()
         if layer is self._selected:
             self._build_property_panel()
         self._schedule_render()
 
     def _move_layer_z(self, layer, direction):
-        # TODO Tarea 2: envolver en Command
         layers_by_z = sorted(self.slide.layers, key=lambda l: l.z, reverse=True)
         idx = layers_by_z.index(layer)
         swap_idx = idx - direction
         if swap_idx < 0 or swap_idx >= len(layers_by_z):
             return
         other = layers_by_z[swap_idx]
-        layer.z, other.z = other.z, layer.z
+        from .commands import ReorderLayerCommand
+        self.commands.push(ReorderLayerCommand(layer, layer.z, other.z, other, other.z, layer.z))
         self._refresh_layers_list()
         self._schedule_render()
 
     def _duplicate_layer(self, layer):
-        # TODO Tarea 2: envolver en Command
         import dataclasses
         new_layer = dataclasses.replace(layer)
         new_layer.id = _short_id()
         new_layer.name = layer.name + " (copia)"
         new_layer.z = max((l.z for l in self.slide.layers), default=0) + 1
-        self.slide.layers.append(new_layer)
+        index = len(self.slide.layers)
+        from .commands import AddLayerCommand
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
         self._set_selected(new_layer)
         self._refresh_layers_list()
         self._schedule_render()
 
     def _delete_layer(self, layer):
-        # TODO Tarea 2: envolver en Command
-        self.slide.layers.remove(layer)
+        from .commands import DeleteLayerCommand
+        self.commands.push(DeleteLayerCommand(self.slide.layers, layer))
         if layer is self._selected:
             self._set_selected(None)
         self._refresh_layers_list()
         self._schedule_render()
 
     def _rename_layer(self, layer, new_name):
-        # TODO Tarea 2: envolver en Command
-        layer.name = new_name
+        old_name = layer.name
+        if old_name != new_name:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(layer, "name", old_name, new_name))
         self._refresh_layers_list()
 
     def _build_property_panel(self):
@@ -521,6 +527,8 @@ class App(tk.Tk):
                       style="Brand.Horizontal.TScale", state=state,
                       command=lambda _v, e=elem, p=param, ap=as_percent: self._on_slider(e, p, ap))
         s.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        s.bind("<ButtonPress-1>", lambda e, el=elem, p=param: self._on_slider_press(el, p))
+        s.bind("<ButtonRelease-1>", lambda e, el=elem, p=param: self._on_slider_release(el, p))
 
         entry_var = tk.StringVar(value=self._format_value(value, as_percent))
         entry = tk.Entry(row, textvariable=entry_var, width=6, bg=FIELD, fg=TEXT,
@@ -546,20 +554,37 @@ class App(tk.Tk):
         value = min(hi, max(lo, value))
         var.set(value)
         entry_var.set(self._format_value(value, as_percent))
-        self._set_layer_value(elem, param, value)
+
+        old_value = self._get_layer_value(elem, param)
+        if old_value != value:
+            layer = self._layer_by_kind(elem)
+            from .commands import PropertyChangeCommand, CompositeCommand
+            if elem == "logo" and param == "size":
+                self.commands.push(CompositeCommand([
+                    PropertyChangeCommand(layer, "w", old_value, value),
+                    PropertyChangeCommand(layer, "h", old_value, value),
+                ]))
+            else:
+                self.commands.push(PropertyChangeCommand(layer, param, old_value, value))
         self._schedule_render()
 
     def _toggle_visible(self):
         if self._selected is None:
             return
-        self._selected.visible = not self._selected.visible
+        from .commands import PropertyChangeCommand
+        layer = self._selected
+        old_value = layer.visible
+        self.commands.push(PropertyChangeCommand(layer, "visible", old_value, not old_value))
         self._build_property_panel()
         self._schedule_render()
 
     def _toggle_locked(self):
         if self._selected is None:
             return
-        self._selected.locked = not self._selected.locked
+        from .commands import PropertyChangeCommand
+        layer = self._selected
+        old_value = layer.locked
+        self.commands.push(PropertyChangeCommand(layer, "locked", old_value, not old_value))
         self._build_property_panel()
         self._schedule_render()
 
@@ -578,14 +603,22 @@ class App(tk.Tk):
         new_x0, new_y0 = _center_position(axis, x0, y0, bw, bh, iw, ih)
 
         layer = self._selected
+        old_x, old_y = layer.x, layer.y
         if kind == "sub":
             half_w = bw / 2
             cx = new_x0 + half_w
-            layer.x = min(1.0, max(0.0, cx / iw))
-            layer.y = min(1.0, max(0.0, new_y0 / ih))
+            final_x = min(1.0, max(0.0, cx / iw))
+            final_y = min(1.0, max(0.0, new_y0 / ih))
         else:
-            layer.x = min(1.0, max(0.0, new_x0 / iw))
-            layer.y = min(1.0, max(0.0, new_y0 / ih))
+            final_x = min(1.0, max(0.0, new_x0 / iw))
+            final_y = min(1.0, max(0.0, new_y0 / ih))
+
+        if (final_x, final_y) != (old_x, old_y):
+            from .commands import PropertyChangeCommand, CompositeCommand
+            self.commands.push(CompositeCommand([
+                PropertyChangeCommand(layer, "x", old_x, final_x),
+                PropertyChangeCommand(layer, "y", old_y, final_y),
+            ]))
 
         self._sync_sliders()
         self._render_now()
@@ -638,6 +671,29 @@ class App(tk.Tk):
         if entry_var is not None:
             entry_var.set(self._format_value(value, as_percent))
         self._schedule_render()
+
+    def _on_slider_press(self, elem, param):
+        self._slider_start_value = self._get_layer_value(elem, param)
+
+    def _on_slider_release(self, elem, param):
+        if self._slider_start_value is None:
+            return
+        old_value = self._slider_start_value
+        self._slider_start_value = None
+        layer = self._layer_by_kind(elem)
+        if elem == "logo" and param == "size":
+            new_w, new_h = layer.w, layer.h
+            if (old_value, old_value) != (new_w, new_h):
+                from .commands import PropertyChangeCommand, CompositeCommand
+                self.commands.push(CompositeCommand([
+                    PropertyChangeCommand(layer, "w", old_value, new_w),
+                    PropertyChangeCommand(layer, "h", old_value, new_h),
+                ]))
+            return
+        new_value = self._get_layer_value(elem, param)
+        if old_value != new_value:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
 
     def _sync_sliders(self):
         """Refleja el estado actual en los controles del panel activo, sin disparar render."""
@@ -788,8 +844,15 @@ class App(tk.Tk):
         if kind == "photo":
             return
         layer = self._selected
-        layer.x = min(1.0, max(0.0, layer.x + dx_sign * step))
-        layer.y = min(1.0, max(0.0, layer.y + dy_sign * step))
+        old_x, old_y = layer.x, layer.y
+        new_x = min(1.0, max(0.0, layer.x + dx_sign * step))
+        new_y = min(1.0, max(0.0, layer.y + dy_sign * step))
+        if (new_x, new_y) != (old_x, old_y):
+            from .commands import PropertyChangeCommand, CompositeCommand
+            self.commands.push(CompositeCommand([
+                PropertyChangeCommand(layer, "x", old_x, new_x),
+                PropertyChangeCommand(layer, "y", old_y, new_y),
+            ]))
         self._sync_sliders()
         self._render_now()
 
