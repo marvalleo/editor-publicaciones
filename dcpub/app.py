@@ -116,12 +116,16 @@ class App(tk.Tk):
         self._updating = False       # evita bucles slider<->drag
         self._drag_elem = None
         self._drag_off = (0, 0)
+        self._drag_start_xy = None
         self._last_bboxes = {}
         self._img_wh = (0, 0)        # tamaño en px de la imagen mostrada
         self._selected = None        # Layer seleccionada actualmente, o None
         self._handles = {}           # {nombre_handle: (x,y) en px de pantalla}
         self._resize = None          # estado del arrastre de resize en curso, o None
         self._guides = []            # líneas guía activas durante un arrastre, [(tipo,pos_px), ...]
+
+        from .commands import CommandStack
+        self.commands = CommandStack(on_change=self._on_commands_changed)
 
         self._build_ui()
 
@@ -178,6 +182,10 @@ class App(tk.Tk):
             self.bind(f"<{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP))
             self.bind(f"<Shift-{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP_SHIFT))
             self.bind(f"<Alt-{key}>", lambda e, dx=dx, dy=dy: self._nudge(dx, dy, NUDGE_STEP_ALT))
+
+        self.bind("<Control-z>", lambda e: self._undo())
+        self.bind("<Control-y>", lambda e: self._redo())
+        self.bind("<Control-Shift-Z>", lambda e: self._redo())
 
     def _build_left(self, left):
         pad = {"padx": 16}
@@ -655,6 +663,26 @@ class App(tk.Tk):
         self._selected = None
         self._build_property_panel()
         self._schedule_render()
+
+    def _on_commands_changed(self):
+        """Callback del CommandStack: se ejecuta en cada push/undo/redo."""
+        pass  # La Tarea 3 (guardar/abrir) engancha aquí el flag de "sin guardar".
+
+    def _undo(self):
+        if self.commands.undo():
+            self._after_history_change()
+
+    def _redo(self):
+        if self.commands.redo():
+            self._after_history_change()
+
+    def _after_history_change(self):
+        """Refresca toda la UI después de un undo/redo, porque el modelo
+        cambió por fuera del flujo normal de edición."""
+        self._sync_sliders()
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._render_now()
 
     # ── Selección ──────────────────────────────────────────────
     def _set_selected(self, layer):
