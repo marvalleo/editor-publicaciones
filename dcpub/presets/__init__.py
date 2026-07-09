@@ -1,0 +1,2 @@
+"""Presets reutilizables de marca."""
+
