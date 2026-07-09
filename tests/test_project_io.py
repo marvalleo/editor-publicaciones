@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from dcpub.models import Project, Slide, PhotoLayer, LogoLayer, crear_proyecto_por_defecto
+from dcpub.models import Project, Slide, PhotoLayer, LogoLayer, CTALayer, crear_proyecto_por_defecto
 from dcpub.project_io import save_project, load_project
 
 
@@ -117,6 +117,81 @@ class TestLoadProject(unittest.TestCase):
             self.assertEqual(Path(loaded_photo.src).resolve(), photo_path.resolve())
         finally:
             other_dir.cleanup()
+
+
+class TestLoadProjectMigratesLegacyBoxSize(unittest.TestCase):
+    def test_zero_w_h_box_layer_gets_new_defaults_on_load(self):
+        project = crear_proyecto_por_defecto("foto.jpg")
+        desc = next(l for l in project.slides[0].layers if l.type == "box")
+        desc.w = 0.0
+        desc.h = 0.0
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "proyecto.dcpub.json"
+            save_project(project, path)
+
+            # Confirmar que el archivo en disco efectivamente quedo en 0,0
+            # (proyecto "legado" simulado), antes de cargarlo.
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw_box = next(l for l in raw["slides"][0]["layers"] if l["type"] == "box")
+            self.assertEqual((raw_box["w"], raw_box["h"]), (0.0, 0.0))
+
+            reloaded = load_project(path)
+
+            # El archivo en disco no debe haber sido reescrito por load_project.
+            raw_after_load = json.loads(path.read_text(encoding="utf-8"))
+            raw_box_after_load = next(
+                l for l in raw_after_load["slides"][0]["layers"] if l["type"] == "box"
+            )
+            self.assertEqual((raw_box_after_load["w"], raw_box_after_load["h"]), (0.0, 0.0))
+
+        reloaded_desc = next(l for l in reloaded.slides[0].layers if l.type == "box")
+        self.assertEqual(reloaded_desc.w, 0.90)
+        self.assertEqual(reloaded_desc.h, 0.12)
+
+    def test_nonzero_w_h_box_layer_is_left_untouched_on_load(self):
+        project = crear_proyecto_por_defecto("foto.jpg")
+        desc = next(l for l in project.slides[0].layers if l.type == "box")
+        desc.w = 0.5
+        desc.h = 0.25
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "proyecto.dcpub.json"
+            save_project(project, path)
+            reloaded = load_project(path)
+
+        reloaded_desc = next(l for l in reloaded.slides[0].layers if l.type == "box")
+        self.assertEqual(reloaded_desc.w, 0.5)
+        self.assertEqual(reloaded_desc.h, 0.25)
+
+    def test_partial_zero_w_h_box_layer_only_fixes_the_zero_dimension(self):
+        project = crear_proyecto_por_defecto("foto.jpg")
+        desc = next(l for l in project.slides[0].layers if l.type == "box")
+        desc.w = 0.5
+        desc.h = 0.0
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "proyecto.dcpub.json"
+            save_project(project, path)
+            reloaded = load_project(path)
+
+        reloaded_desc = next(l for l in reloaded.slides[0].layers if l.type == "box")
+        self.assertEqual(reloaded_desc.w, 0.5)
+        self.assertEqual(reloaded_desc.h, 0.12)
+
+    def test_zero_w_h_cta_layer_is_not_migrated(self):
+        project = crear_proyecto_por_defecto("foto.jpg")
+        cta = CTALayer(id="cta-test", name="CTA", z=99, x=0.0, y=0.0, w=0.0, h=0.0, text="Reserva ya")
+        project.slides[0].layers.append(cta)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "proyecto.dcpub.json"
+            save_project(project, path)
+            reloaded = load_project(path)
+
+        reloaded_cta = next(l for l in reloaded.slides[0].layers if l.type == "cta")
+        self.assertEqual(reloaded_cta.w, 0.0)
+        self.assertEqual(reloaded_cta.h, 0.0)
 
 
 if __name__ == "__main__":
