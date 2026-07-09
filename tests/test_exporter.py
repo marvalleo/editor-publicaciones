@@ -124,5 +124,35 @@ class TestExporterExportarTodas(unittest.TestCase):
             self.assertNotEqual(img_2.getpixel((10, 10)), img_3.getpixel((10, 10)))
 
 
+class TestLayersFromSlideBoxAndCTA(unittest.TestCase):
+    def test_box_layer_includes_fill_text_color_w_h(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto
+        slide = crear_slide_por_defecto("foto.jpg", descripcion="Texto")
+        desc = next(l for l in slide.layers if l.type == "box")
+        desc.fill = [1, 2, 3, 100]
+        desc.text_color = [4, 5, 6, 200]
+
+        capas = _layers_from_slide(slide)
+
+        desc_capa = next(c for c in capas if c["type"] == "desc")
+        self.assertEqual(desc_capa["fill"], [1, 2, 3, 100])
+        self.assertEqual(desc_capa["text_color"], [4, 5, 6, 200])
+        self.assertEqual(desc_capa["w"], desc.w)
+        self.assertEqual(desc_capa["h"], desc.h)
+
+    def test_cta_layer_included(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto, CTALayer
+        slide = crear_slide_por_defecto("foto.jpg")
+        slide.layers.append(CTALayer(name="CTA", z=10, text="Reservá",
+                                      x=0.1, y=0.9, w=0.3, h=0.08))
+
+        capas = _layers_from_slide(slide)
+
+        cta_capa = next(c for c in capas if c["type"] == "cta")
+        self.assertEqual(cta_capa["text"], "Reservá")
+
+
 if __name__ == "__main__":
     unittest.main()

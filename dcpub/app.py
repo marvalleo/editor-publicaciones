@@ -1386,7 +1386,14 @@ class App(tk.Tk):
                 icon = self.v_icon.get() if es_desc_activa else layer.icon
                 layers.append({"type": "desc", "key": layer.id, "text": text,
                                 "icon": icon, "x": layer.x, "y": layer.y,
+                                "w": layer.w, "h": layer.h, "fill": layer.fill,
+                                "text_color": layer.text_color,
                                 "size": layer.size, "opacity": layer.opacity})
+            elif layer.type == "cta":
+                layers.append({"type": "cta", "key": layer.id, "text": layer.text,
+                                "x": layer.x, "y": layer.y, "w": layer.w, "h": layer.h,
+                                "size": layer.size, "fill": layer.fill,
+                                "text_color": layer.text_color, "opacity": layer.opacity})
         return layers
 
     def _build_layers(self):

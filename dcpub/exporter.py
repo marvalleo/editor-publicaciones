@@ -83,7 +83,25 @@ def _layers_from_slide(slide) -> list[dict]:
                 "icon": layer.icon,
                 "x": layer.x,
                 "y": layer.y,
+                "w": layer.w,
+                "h": layer.h,
                 "size": layer.size,
+                "fill": layer.fill,
+                "text_color": layer.text_color,
+                "opacity": layer.opacity,
+            })
+        elif layer.type == "cta":
+            layers.append({
+                "type": "cta",
+                "key": layer.id,
+                "text": layer.text,
+                "x": layer.x,
+                "y": layer.y,
+                "w": layer.w,
+                "h": layer.h,
+                "size": layer.size,
+                "fill": layer.fill,
+                "text_color": layer.text_color,
                 "opacity": layer.opacity,
             })
     return layers

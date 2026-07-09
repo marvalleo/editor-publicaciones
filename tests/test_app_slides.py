@@ -273,6 +273,37 @@ class TestBuildLayersFor(unittest.TestCase):
         titulo = next(c for c in capas if c["type"] == "title")
         self.assertEqual(titulo["text"], "Via _build_layers")
 
+    def test_build_layers_for_includes_box_fill_text_color_w_h(self):
+        app = _make_app_with_two_slides()
+        desc = App._layer_by_kind(app, "desc", app.slide)
+        desc.fill = [1, 2, 3, 100]
+        desc.text_color = [4, 5, 6, 200]
+        desc.w = 0.5
+        desc.h = 0.2
+
+        capas = App._build_layers_for(app, app.slide)
+
+        desc_capa = next(c for c in capas if c["type"] == "desc")
+        self.assertEqual(desc_capa["fill"], [1, 2, 3, 100])
+        self.assertEqual(desc_capa["text_color"], [4, 5, 6, 200])
+        self.assertEqual(desc_capa["w"], 0.5)
+        self.assertEqual(desc_capa["h"], 0.2)
+
+    def test_build_layers_for_includes_cta_layer(self):
+        from dcpub.models import CTALayer
+        app = _make_app_with_two_slides()
+        cta = CTALayer(name="CTA", z=10, text="Reservá ahora", x=0.1, y=0.9,
+                        w=0.3, h=0.08, fill=[9, 9, 9, 200], text_color=[255, 255, 255, 255])
+        app.slide.layers.append(cta)
+
+        capas = App._build_layers_for(app, app.slide)
+
+        cta_capa = next(c for c in capas if c["type"] == "cta")
+        self.assertEqual(cta_capa["text"], "Reservá ahora")
+        self.assertEqual(cta_capa["fill"], [9, 9, 9, 200])
+        self.assertEqual(cta_capa["w"], 0.3)
+        self.assertEqual(cta_capa["h"], 0.08)
+
     def test_build_layers_for_includes_photo_adjust_and_overlay(self):
         app = _make_app_with_two_slides()
         foto = App._layer_by_kind(app, "photo", app.slide)
