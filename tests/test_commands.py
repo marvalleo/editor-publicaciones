@@ -31,6 +31,35 @@ class TestPropertyChangeCommand(unittest.TestCase):
         self.assertEqual(obj.x, 0.1)
 
 
+class TestDictItemChangeCommand(unittest.TestCase):
+    def test_execute_sets_new_value(self):
+        from dcpub.commands import DictItemChangeCommand
+        adjust = {"brightness": 1.0}
+        cmd = DictItemChangeCommand(adjust, "brightness", 1.0, 1.4)
+        cmd.execute()
+        self.assertEqual(adjust["brightness"], 1.4)
+
+    def test_undo_restores_old_value(self):
+        from dcpub.commands import DictItemChangeCommand
+        adjust = {"brightness": 1.0}
+        cmd = DictItemChangeCommand(adjust, "brightness", 1.0, 1.4)
+        cmd.execute()
+        cmd.undo()
+        self.assertEqual(adjust["brightness"], 1.0)
+
+    def test_works_inside_composite_command(self):
+        from dcpub.commands import DictItemChangeCommand, CompositeCommand
+        overlay = {"bottom_grad": False, "top_grad": False}
+        cmd = CompositeCommand([
+            DictItemChangeCommand(overlay, "bottom_grad", False, True),
+            DictItemChangeCommand(overlay, "top_grad", False, True),
+        ])
+        cmd.execute()
+        self.assertEqual(overlay, {"bottom_grad": True, "top_grad": True})
+        cmd.undo()
+        self.assertEqual(overlay, {"bottom_grad": False, "top_grad": False})
+
+
 class TestAddLayerCommand(unittest.TestCase):
     def test_execute_inserts_at_index(self):
         layers = [_Dummy(name="a"), _Dummy(name="c")]

@@ -21,6 +21,23 @@ class PropertyChangeCommand:
         setattr(self.target, self.attr, self.old_value)
 
 
+class DictItemChangeCommand:
+    """Como PropertyChangeCommand pero para un valor dentro de un dict
+    anidado (adjust/overlay de PhotoLayer), reversible igual."""
+
+    def __init__(self, target_dict, key, old_value, new_value):
+        self.target_dict = target_dict
+        self.key = key
+        self.old_value = old_value
+        self.new_value = new_value
+
+    def execute(self):
+        self.target_dict[self.key] = self.new_value
+
+    def undo(self):
+        self.target_dict[self.key] = self.old_value
+
+
 class AddLayerCommand:
     """Inserta `layer` en `layers_list` en la posición `index`."""
 
