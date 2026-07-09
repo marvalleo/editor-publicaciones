@@ -113,3 +113,9 @@ Fase 4 vuelva a tocar el panel de propiedades); pan+wheel simultaneo (no alcanza
 desktop single-pointer). Suite final: 216 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge.
+
+# Progreso — Fase 4 sub-fase 1 (CTA + caja de descripcion configurable)
+
+Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
+
+- Tarea 1 (modelo: BoxLayer.fill/text_color + CTALayer): complete (commit 162b434..578af3f, review clean, 218 tests)
