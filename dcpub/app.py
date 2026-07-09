@@ -816,6 +816,66 @@ class App(tk.Tk):
         self._refresh_layers_list()
         self._schedule_render()
 
+    def _add_slide(self):
+        """Inserta una lámina en blanco (layout default) justo después de la
+        lámina activa, con el mismo formato que la lámina activa."""
+        from .models import crear_slide_por_defecto
+        from .commands import AddSlideCommand
+        nueva = crear_slide_por_defecto(formato=dict(self.slide.format))
+        index = self.current_slide_index + 1
+        self.commands.push(AddSlideCommand(self.project.slides, nueva, index))
+        self.switch_to_slide(index)
+
+    def _duplicate_slide(self):
+        """Inserta una copia completa (texto incluido) de la lámina activa
+        justo después de ella."""
+        from .models import duplicar_slide
+        from .commands import AddSlideCommand
+        copia = duplicar_slide(self.slide)
+        index = self.current_slide_index + 1
+        self.commands.push(AddSlideCommand(self.project.slides, copia, index))
+        self.switch_to_slide(index)
+
+    def _delete_slide(self):
+        """Elimina la lámina activa, salvo que sea la última del proyecto."""
+        if len(self.project.slides) <= 1:
+            self.v_status.set("No se puede eliminar la última lámina.")
+            return
+        from .commands import DeleteSlideCommand
+        slide_a_borrar = self.slide
+        nuevo_index = min(self.current_slide_index, len(self.project.slides) - 2)
+        self.commands.push(DeleteSlideCommand(self.project.slides, slide_a_borrar))
+        self.switch_to_slide(nuevo_index)
+
+    def _move_slide(self, direction):
+        """Intercambia la lámina activa con la adyacente (direction=-1 sube,
+        +1 baja). No hace nada si ya está en el extremo."""
+        idx = self.current_slide_index
+        otro = idx + direction
+        if otro < 0 or otro >= len(self.project.slides):
+            return
+        from .commands import ReorderSlideCommand
+        self.commands.push(ReorderSlideCommand(self.project.slides, idx, otro))
+        self.switch_to_slide(otro)
+
+    def _copy_style_to_slide(self, origen_slide, destino_index):
+        """Copia posición/tamaño/estilo de las capas de `origen_slide` hacia
+        la lámina en `destino_index`, preservando el texto/contenido que esa
+        lámina ya tenía."""
+        if destino_index < 0 or destino_index >= len(self.project.slides):
+            return
+        from .models import plan_copia_estilo
+        from .commands import PropertyChangeCommand, CompositeCommand
+        destino = self.project.slides[destino_index]
+        cambios = plan_copia_estilo(origen_slide, destino)
+        if not cambios:
+            return
+        comandos = [PropertyChangeCommand(layer, attr, getattr(layer, attr), nuevo)
+                    for layer, attr, nuevo in cambios]
+        self.commands.push(CompositeCommand(comandos))
+        if destino_index == self.current_slide_index:
+            self._render_now()
+
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]

@@ -97,5 +97,112 @@ class TestSwitchToSlide(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
 
+class TestAddSlide(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+
+    def test_inserts_after_current_slide(self):
+        App._add_slide(self.app)
+        self.assertEqual(len(self.app.project.slides), 3)
+        self.assertIs(self.app.project.slides[1], self.app.slide)
+
+    def test_new_slide_uses_current_format(self):
+        self.app.slide.format = {"name": "custom", "w": 800, "h": 1000}
+        App._add_slide(self.app)
+        self.assertEqual(self.app.slide.format, {"name": "custom", "w": 800, "h": 1000})
+
+    def test_undo_removes_the_added_slide(self):
+        App._add_slide(self.app)
+        self.app.commands.undo()
+        self.assertEqual(len(self.app.project.slides), 2)
+
+
+class TestDuplicateSlide(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+
+    def test_duplicate_inserts_copy_after_current(self):
+        App._duplicate_slide(self.app)
+        self.assertEqual(len(self.app.project.slides), 3)
+        self.assertEqual(self.app.project.slides[1].layers[2].text, "Titulo lamina 1")
+        self.assertIsNot(self.app.project.slides[1], self.app.project.slides[0])
+
+
+class TestDeleteSlide(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+        self.app.v_status = _FakeVar("")
+
+    def test_deletes_current_slide(self):
+        App._delete_slide(self.app)
+        self.assertEqual(len(self.app.project.slides), 1)
+        self.assertEqual(self.app.project.slides[0].layers[2].text, "Titulo lamina 2")
+
+    def test_refuses_to_delete_last_slide(self):
+        App._delete_slide(self.app)  # queda 1 lamina
+        App._delete_slide(self.app)  # no deberia borrar la ultima
+        self.assertEqual(len(self.app.project.slides), 1)
+
+
+class TestMoveSlide(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+
+    def test_move_down_swaps_with_next(self):
+        primero = self.app.project.slides[0]
+        App._move_slide(self.app, 1)
+        self.assertIs(self.app.project.slides[1], primero)
+        self.assertEqual(self.app.current_slide_index, 1)
+
+    def test_move_up_from_first_is_noop(self):
+        App._move_slide(self.app, -1)
+        self.assertEqual(self.app.current_slide_index, 0)
+
+
+class TestCopyStyleToSlide(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._render_now = lambda: None
+
+    def test_copies_style_without_touching_text(self):
+        origen = self.app.project.slides[0]
+        origen.layers[2].x = 0.9
+        App._copy_style_to_slide(self.app, origen, 1)
+        destino = self.app.project.slides[1]
+        self.assertEqual(destino.layers[2].x, 0.9)
+        self.assertEqual(destino.layers[2].text, "Titulo lamina 2")
+
+    def test_undo_reverts_the_copy(self):
+        origen = self.app.project.slides[0]
+        origen.layers[2].x = 0.9
+        destino = self.app.project.slides[1]
+        x_original = destino.layers[2].x
+        App._copy_style_to_slide(self.app, origen, 1)
+        self.app.commands.undo()
+        self.assertEqual(destino.layers[2].x, x_original)
+
+
 if __name__ == "__main__":
     unittest.main()
