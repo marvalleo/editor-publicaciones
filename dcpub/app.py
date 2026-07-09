@@ -96,6 +96,7 @@ class App(tk.Tk):
         # Proyecto y lámina activos (modelo formal de dcpub.models)
         self.project = crear_proyecto_por_defecto()
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
 
         # Variables de texto
         self.v_photo = tk.StringVar()
@@ -782,9 +783,43 @@ class App(tk.Tk):
                 entry_var.set(self._format_value(value, param == "opacity"))
         self._updating = False
 
+    def _sync_widgets_from_slide(self):
+        """Refleja el contenido de self.slide en los widgets de texto/foto/logo
+        del panel izquierdo. Mismo bloque que usaba _open_project, ahora
+        reutilizable también al cambiar de lámina activa."""
+        photo_layer = self._layer_by_kind("photo")
+        self.v_photo.set(photo_layer.src if photo_layer else "")
+        logo_layer = self._layer_by_kind("logo")
+        self.v_logo.set(logo_layer.src if logo_layer and logo_layer.src else str(LOGO_FILE))
+        title_layer = self._layer_by_kind("title")
+        self.txt_title.delete("1.0", tk.END)
+        self.txt_title.insert("1.0", title_layer.text if title_layer else "")
+        sub_layer = self._layer_by_kind("sub")
+        self.v_sub.set(sub_layer.text if sub_layer else "")
+        desc_layer = self._layer_by_kind("desc")
+        self.txt_desc.delete("1.0", tk.END)
+        self.txt_desc.insert("1.0", desc_layer.text if desc_layer else "")
+        self.v_icon.set(desc_layer.icon if desc_layer else "planta")
+        self.v_format.set(self._format_label_for(self.slide.format))
+
+    def switch_to_slide(self, index):
+        """Cambia la lámina activa a project.slides[index] y refresca toda la
+        UI dependiente (widgets de texto, panel de propiedades, panel de
+        capas, vista previa). No hace nada si el índice está fuera de rango."""
+        if index < 0 or index >= len(self.project.slides):
+            return
+        self.current_slide_index = index
+        self.slide = self.project.slides[index]
+        self._selected = None
+        self._sync_widgets_from_slide()
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
         self.v_logo.set(self._default_logo_src())
         self._selected = None
         self._build_property_panel()
@@ -1279,24 +1314,12 @@ class App(tk.Tk):
         loaded = load_project(Path(path_str))
         self.project = loaded
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
         self._project_path = Path(path_str)
         self.commands.clear()
         self._selected = None
 
-        photo_layer = self._layer_by_kind("photo")
-        self.v_photo.set(photo_layer.src if photo_layer else "")
-        logo_layer = self._layer_by_kind("logo")
-        self.v_logo.set(logo_layer.src if logo_layer and logo_layer.src else str(LOGO_FILE))
-        title_layer = self._layer_by_kind("title")
-        self.txt_title.delete("1.0", tk.END)
-        self.txt_title.insert("1.0", title_layer.text if title_layer else "")
-        sub_layer = self._layer_by_kind("sub")
-        self.v_sub.set(sub_layer.text if sub_layer else "")
-        desc_layer = self._layer_by_kind("desc")
-        self.txt_desc.delete("1.0", tk.END)
-        self.txt_desc.insert("1.0", desc_layer.text if desc_layer else "")
-        self.v_icon.set(desc_layer.icon if desc_layer else "planta")
-        self.v_format.set(self._format_label_for(self.slide.format))
+        self._sync_widgets_from_slide()
 
         self._set_dirty(False)
         self._build_property_panel()
