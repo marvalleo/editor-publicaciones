@@ -104,6 +104,8 @@ class App(tk.Tk):
         self.v_desc  = tk.StringVar()
         self.v_icon  = tk.StringVar(value="planta")
         self.v_format = tk.StringVar(value=self._format_label_for(self.slide.format))
+        self.v_export_fmt = tk.StringVar(value="png")
+        self.v_export_dir = tk.StringVar(value=str(OUTPUT_DIR))
         self.v_status = tk.StringVar(value="Listo.")
         self.v_readout = tk.StringVar(value="")
 
@@ -271,9 +273,22 @@ class App(tk.Tk):
         tk.Button(left, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 10), pady=8, command=self._render_now).pack(
             fill=tk.X, pady=(6, 4), **pad)
-        tk.Button(left, text="💾  Generar y guardar", bg=ACCENT, fg="white", relief="flat",
-                  font=("Segoe UI", 11, "bold"), pady=9, command=self._generate).pack(
-            fill=tk.X, pady=(0, 6), **pad)
+
+        export_row = tk.Frame(left, bg=PANEL)
+        export_row.pack(fill=tk.X, pady=(2, 2), **pad)
+        tk.Label(export_row, text="Formato:", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 9)).pack(side=tk.LEFT)
+        cb_fmt = ttk.Combobox(export_row, textvariable=self.v_export_fmt,
+                              values=["png", "jpg"], state="readonly", width=6,
+                              font=("Segoe UI", 9))
+        cb_fmt.pack(side=tk.LEFT, padx=(6, 0))
+        tk.Button(export_row, text="📁 Carpeta…", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._choose_export_dir).pack(
+            side=tk.RIGHT)
+
+        tk.Button(left, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
+                  font=("Segoe UI", 11, "bold"), pady=9, command=self._export).pack(
+            fill=tk.X, pady=(4, 6), **pad)
 
         tk.Label(left, textvariable=self.v_status, bg=PANEL, fg=MUTED,
                  font=("Segoe UI", 9), wraplength=250, justify="left").pack(
@@ -1197,8 +1212,14 @@ class App(tk.Tk):
         if self._confirm_discard_changes():
             self.destroy()
 
-    # ── Generar en alta resolución ─────────────────────────────
-    def _generate(self):
+    # ── Exportar en alta resolución ────────────────────────────
+    def _choose_export_dir(self):
+        path = filedialog.askdirectory(title="Elegir carpeta de destino",
+                                        initialdir=self.v_export_dir.get())
+        if path:
+            self.v_export_dir.set(path)
+
+    def _export(self):
         path = self.v_photo.get().strip()
         if not path:
             messagebox.showerror("Error", "Selecciona una foto primero.")
@@ -1207,21 +1228,17 @@ class App(tk.Tk):
             messagebox.showerror("Error", f"No se encontró la foto:\n{path}")
             return
 
-        OUTPUT_DIR.mkdir(exist_ok=True)
-        src = Path(path)
-        out_path = OUTPUT_DIR / (src.stem + "_publicacion.jpg")
-
-        self.v_status.set("Generando imagen en alta resolución…")
+        self._sync_text_to_layers()
+        self.v_status.set("Exportando imagen en alta resolución…")
         self.update()
         try:
-            with Image.open(path) as im:
-                native = max(im.size)
-            max_side = min(max(native, 1200), 2400)
-            canvas_size = self._canvas_size_for(max_side)
-            img, _ = compose(self._build_layers(), canvas_size, self.font_manager)
-            img.convert("RGB").save(str(out_path), quality=95)
-            self.v_status.set(f"✅  Guardada en: publicaciones/{out_path.name}")
-            messagebox.showinfo("¡Listo!", f"Imagen guardada en:\n{out_path}")
+            from .exporter import export_image
+            dest_dir = Path(self.v_export_dir.get() or OUTPUT_DIR)
+            out_path = export_image(
+                self.project, self._build_layers(), self.font_manager,
+                dest_dir, fmt=self.v_export_fmt.get())
+            self.v_status.set(f"✅  Exportada: {out_path.name}")
+            messagebox.showinfo("¡Listo!", f"Imagen exportada en:\n{out_path}")
         except Exception as e:
             self.v_status.set(f"Error: {e}")
-            messagebox.showerror("Error al generar", str(e))
+            messagebox.showerror("Error al exportar", str(e))
