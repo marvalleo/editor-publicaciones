@@ -88,3 +88,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
 - Tarea 2 (rangos/etiquetas de ajuste): complete (commit 813d923..81603eb, review clean, 193 tests)
 - Tarea 3 (DictItemChangeCommand): complete (commit 9cc639c..fe72361, review clean, 196 tests)
 - Tarea 4 (params anidados en sliders/undo): complete (commit cd060d0..602edf4, review clean, 200 tests)
+- Tarea 5 (seccion de UI Ajustes): complete (commit 243d6fc..8602f86, review clean, 203 tests)
