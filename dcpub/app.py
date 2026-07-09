@@ -27,9 +27,11 @@ SIZE_RANGE = {
     "title": (0.03, 0.16),
     "sub":   (0.02, 0.10),
     "desc":  (0.015, 0.07),
+    "cta":   (0.015, 0.07),
 }
 
-LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción"}
+LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción",
+          "cta": "CTA"}
 
 # Rangos de los ajustes fotográficos, alineados a los clamps de render.py
 ADJUST_RANGE = {
@@ -587,6 +589,9 @@ class App(tk.Tk):
         size_label = "Tamaño del logo" if kind == "logo" else "Tamaño de fuente"
         self._slider(card, token, "x", "Posición X", 0.0, 1.0, disabled=disabled)
         self._slider(card, token, "y", "Posición Y", 0.0, 1.0, disabled=disabled)
+        if kind in ("desc", "cta"):
+            self._slider(card, token, "w", "Ancho de la caja", 0.10, 0.95, disabled=disabled)
+            self._slider(card, token, "h", "Alto de la caja", 0.03, 0.50, disabled=disabled)
         self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
         self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
@@ -832,6 +837,8 @@ class App(tk.Tk):
             return "sub"
         if layer.type == "box":
             return "desc"
+        if layer.type == "cta":
+            return "cta"
         return None
 
     def _token_for_layer(self, layer):

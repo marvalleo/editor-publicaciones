@@ -118,5 +118,23 @@ class TestPhotoAdjustSection(unittest.TestCase):
         self.assertEqual(self.foto.overlay["bottom_grad"], not old)
 
 
+class TestKindOfCTA(unittest.TestCase):
+    def test_kind_of_cta_layer_is_cta(self):
+        from dcpub.models import CTALayer
+        app = App.__new__(App)
+        layer = CTALayer()
+        self.assertEqual(App._kind_of(app, layer), "cta")
+
+
+class TestSizeRangeAndLabelsIncludeCTA(unittest.TestCase):
+    def test_cta_has_size_range(self):
+        from dcpub.app import SIZE_RANGE
+        self.assertIn("cta", SIZE_RANGE)
+
+    def test_cta_has_label(self):
+        from dcpub.app import LABELS
+        self.assertIn("cta", LABELS)
+
+
 if __name__ == "__main__":
     unittest.main()
