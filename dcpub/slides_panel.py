@@ -122,9 +122,10 @@ class SlidesPanel(tk.Frame):
         try:
             img, _ = compose(self.app._build_layers_for(slide), canvas_size, self.app.font_manager)
             img = img.convert("RGB")
-        except Exception:
+        except Exception as e:
             # Todavía no hay foto válida (p.ej. recién abierta la app, sin
             # elegir imagen): mostrar un placeholder en vez de romper la UI.
+            print(f"Advertencia: no se pudo componer miniatura de lámina: {e}")
             img = Image.new("RGB", canvas_size, "#3d3d3d")
         imgtk = ImageTk.PhotoImage(img)
         self._thumb_cache[cache_key] = (firma, imgtk)
