@@ -162,6 +162,7 @@ class App(tk.Tk):
         self._resize = None          # estado del arrastre de resize en curso, o None
         self._guides = []            # líneas guía activas durante un arrastre, [(tipo,pos_px), ...]
         self._adjust_expanded = False  # colapsado por defecto
+        self._photo_pan = None       # datos del arrastre de encuadre en curso, o None
 
         from .commands import CommandStack
         self.commands = CommandStack(on_change=self._on_commands_changed)
@@ -1432,6 +1433,43 @@ class App(tk.Tk):
         ox, oy = getattr(self, "_img_origin", (0, 0))
         return ex - ox, ey - oy
 
+    def _start_photo_pan(self, photo_layer, ix, iy):
+        """Prepara el arrastre de encuadre (panear) sobre la capa foto."""
+        from PIL import Image as _Image
+        from .render import excess_for_zoom
+        try:
+            with _Image.open(photo_layer.src) as im:
+                photo_wh = im.size
+        except (FileNotFoundError, OSError):
+            return
+        iw, ih = self._img_wh
+        if iw == 0 or ih == 0:
+            return
+        excess_x, excess_y = excess_for_zoom(photo_wh, (iw, ih), photo_layer.zoom)
+        self._drag_elem = "__photo_pan__"
+        self._photo_pan = {
+            "layer": photo_layer,
+            "excess": (excess_x, excess_y),
+            "start_offset": (photo_layer.offset_x, photo_layer.offset_y),
+            "start_point": (ix, iy),
+        }
+
+    def _apply_photo_pan(self, event):
+        info = self._photo_pan
+        if info is None:
+            return
+        ix, iy = self._canvas_to_img(event.x, event.y)
+        sx, sy = info["start_point"]
+        dx, dy = ix - sx, iy - sy
+        excess_x, excess_y = info["excess"]
+        d_ox, d_oy = _offset_delta_for_drag(dx, dy, excess_x, excess_y)
+        start_ox, start_oy = info["start_offset"]
+        layer = info["layer"]
+        layer.offset_x = min(1.0, max(0.0, start_ox + d_ox))
+        layer.offset_y = min(1.0, max(0.0, start_oy + d_oy))
+        self._sync_sliders()
+        self._render_now()
+
     def _on_press(self, event):
         self._guides = []
         if self._selected is not None:
@@ -1460,12 +1498,16 @@ class App(tk.Tk):
         if (photo_layer is not None and not photo_layer.locked and bb_photo
                 and bb_photo[0] <= ix <= bb_photo[2] and bb_photo[1] <= iy <= bb_photo[3]):
             self._set_selected(photo_layer)
+            self._start_photo_pan(photo_layer, ix, iy)
             return
         self._set_selected(None)
 
     def _on_drag(self, event):
         if self._resize is not None:
             self._apply_resize(event)
+            return
+        if self._drag_elem == "__photo_pan__":
+            self._apply_photo_pan(event)
             return
         if not self._drag_elem:
             return
@@ -1497,6 +1539,21 @@ class App(tk.Tk):
         self._render_now()
 
     def _on_release(self, event):
+        if self._drag_elem == "__photo_pan__" and self._photo_pan is not None:
+            layer = self._photo_pan["layer"]
+            start_ox, start_oy = self._photo_pan["start_offset"]
+            if (layer.offset_x, layer.offset_y) != (start_ox, start_oy):
+                from .commands import PropertyChangeCommand, CompositeCommand
+                self.commands.push(CompositeCommand([
+                    PropertyChangeCommand(layer, "offset_x", start_ox, layer.offset_x),
+                    PropertyChangeCommand(layer, "offset_y", start_oy, layer.offset_y),
+                ]))
+            self._photo_pan = None
+            self._drag_elem = None
+            self._resize = None
+            self._guides = []
+            self._render_now()
+            return
         if self._drag_elem and self._drag_start_xy is not None and self._selected is not None:
             old_x, old_y = self._drag_start_xy
             layer = self._selected
