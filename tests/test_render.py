@@ -439,5 +439,49 @@ class TestDescBoxConfigurable(unittest.TestCase):
         self.assertNotEqual(list(img_white.getdata()), list(img_red.getdata()))
 
 
+class TestCTABox(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "cta", "key": "cta", "text": "Reservá ahora",
+                "x": 0.3, "y": 0.8, "w": 0.4, "h": 0.08, "size": 0.03,
+                "fill": [40, 25, 15, 215], "text_color": [255, 255, 255, 255],
+                "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_cta_produces_bbox_matching_w_h(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer()], (1000, 1000), fm)
+        x0, y0, x1, y1 = bboxes["cta"]
+        self.assertEqual(x1 - x0, int(1000 * 0.4))
+        self.assertEqual(y1 - y0, int(1000 * 0.08))
+
+    def test_cta_empty_text_produces_no_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer(text="")], (1000, 1000), fm)
+        self.assertNotIn("cta", bboxes)
+
+    def test_cta_fill_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_a, _ = compose([self._layer(fill=[40, 25, 15, 215])], (400, 400), fm)
+        img_b, _ = compose([self._layer(fill=[0, 100, 200, 255])], (400, 400), fm)
+        self.assertNotEqual(list(img_a.getdata()), list(img_b.getdata()))
+
+    def test_cta_does_not_draw_icon(self):
+        # No debe lanzar excepción ni requerir clave "icon" en absoluto.
+        from dcpub.render import compose
+        fm = self._font_manager()
+        layer = self._layer()
+        self.assertNotIn("icon", layer)
+        img, bboxes = compose([layer], (1000, 1000), fm)
+        self.assertIn("cta", bboxes)
+
+
 if __name__ == "__main__":
     unittest.main()

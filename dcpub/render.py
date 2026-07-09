@@ -301,6 +301,8 @@ def compose(layers, canvas_size, font_manager, palette=None):
              - title : text, x,y (esquina sup-izq, frac), size (alto de fuente, frac. ancho)
              - sub   : text, x (centro horizontal, frac), y (tope, frac), size (fuente, frac)
              - desc  : text, icon, x,y (esquina sup-izq del recuadro, frac), size (fuente, frac)
+             - cta   : text, x,y (esquina sup-izq, frac), w,h (frac), size (fuente, frac),
+                       fill (rgba), text_color (rgba) — sin ícono, texto centrado
     canvas_size : (ancho, alto) en px del lienzo final.
     font_manager : instancia de FontManager para cargar las fuentes por rol.
 
@@ -483,6 +485,47 @@ def compose(layers, canvas_size, font_manager, palette=None):
                 text_draw = ImageDraw.Draw(text_layer)
                 for i, l in enumerate(dlines):
                     text_draw.text((text_x, dy + i * dlh), l, font=font_b, fill=text_color)
+                canvas = Image.alpha_composite(canvas, text_layer)
+                draw = ImageDraw.Draw(canvas)
+
+                bboxes[bbox_key] = (bx, by, bx + box_w, by + box_h)
+
+        elif kind == "cta":
+            cta_text = layer["text"]
+            if cta_text.strip():
+                bsz = max(8, int(W * layer["size"]))
+                font_b = font_manager.load("body", bsz)
+                box_w = max(1, int(W * layer.get("w", 0.30)))
+                box_h = max(1, int(H * layer.get("h", 0.08)))
+                bx = int(layer["x"] * W)
+                by = int(layer["y"] * H)
+                corner_r = int(W * 0.033)
+                pad = int(W * 0.04)
+
+                box_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                bd = ImageDraw.Draw(box_layer)
+                fill_color = layer.get("fill", BOX_COLOR)
+                box_fill = _apply_opacity(fill_color, opacity)
+                bd.rounded_rectangle([(bx, by), (bx + box_w, by + box_h)],
+                                     radius=corner_r, fill=box_fill)
+                canvas = Image.alpha_composite(canvas, box_layer)
+                draw = ImageDraw.Draw(canvas)
+
+                text_color_value = layer.get("text_color", BLANCO + (255,))
+                text_color = _apply_opacity(text_color_value, opacity)
+                max_text_w = max(10, box_w - pad * 2)
+                dlines = wrap_text(cta_text, font_b, max_text_w, draw)
+                dlh = int(bsz * 1.48)
+                text_h = len(dlines) * dlh
+                dy = by + (box_h - text_h) // 2
+
+                text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                text_draw = ImageDraw.Draw(text_layer)
+                for i, l in enumerate(dlines):
+                    lbbox = text_draw.textbbox((0, 0), l, font=font_b)
+                    lw = lbbox[2] - lbbox[0]
+                    lx = bx + max(pad, (box_w - lw) // 2)
+                    text_draw.text((lx, dy + i * dlh), l, font=font_b, fill=text_color)
                 canvas = Image.alpha_composite(canvas, text_layer)
                 draw = ImageDraw.Draw(canvas)
 
