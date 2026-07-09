@@ -24,6 +24,10 @@ DEFAULT_OVERLAY = {
     "strength": 0.0,
 }
 
+DEFAULT_PALETTE = {
+    "box": list(BOX_COLOR),
+}
+
 
 def draw_icon(draw, x, y, size, icon_type, color):
     lw = max(2, size // 16)
@@ -126,6 +130,17 @@ def _overlay_cache_tuple(values):
     )
 
 
+def _overlay_color_from_palette(palette):
+    values = palette or DEFAULT_PALETTE
+    color = values.get("sombra") or values.get("box") or DEFAULT_PALETTE["box"]
+    if len(color) == 3:
+        r, g, b = color
+        a = 255
+    else:
+        r, g, b, a = color
+    return (int(r), int(g), int(b), int(a))
+
+
 def _apply_warmth(photo, warmth):
     warmth = _clamp(float(warmth), -1.0, 1.0)
     if warmth == 0.0:
@@ -190,7 +205,7 @@ def _apply_photo_adjustments(photo, adjust):
     return photo
 
 
-def _apply_photo_overlay(photo, overlay):
+def _apply_photo_overlay(photo, overlay, palette=None):
     values = _normalized_overlay(overlay)
     strength = _clamp(float(values["strength"]), 0.0, 1.0)
     if strength == 0.0 or not (values["bottom_grad"] or values["top_grad"]):
@@ -198,22 +213,23 @@ def _apply_photo_overlay(photo, overlay):
     w, h = photo.size
     grad = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(grad)
-    max_alpha = int(180 * strength)
+    r, g, b, base_alpha = _overlay_color_from_palette(palette)
+    max_alpha = int(base_alpha * strength)
     if values["bottom_grad"]:
         start = int(h * 0.35)
         for y in range(start, h):
             alpha = int(max_alpha * ((y - start) / max(1, h - start)))
-            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+            draw.line([(0, y), (w, y)], fill=(r, g, b, alpha))
     if values["top_grad"]:
         end = int(h * 0.45)
         for y in range(0, end):
             alpha = int(max_alpha * (1.0 - y / max(1, end)))
-            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+            draw.line([(0, y), (w, y)], fill=(r, g, b, alpha))
     return Image.alpha_composite(photo, grad)
 
 
 def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5,
-                    adjust=None, overlay=None):
+                    adjust=None, overlay=None, palette=None):
     """Recorta la foto tipo "cover" al tamaño exacto del lienzo (sin deformar),
     aplicando zoom y posición de recorte, más el gradiente inferior. Cacheado."""
     Wc, Hc = canvas_size
@@ -224,6 +240,7 @@ def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.
         round(offset_x, 4), round(offset_y, 4),
         _adjust_cache_tuple(adjust_values),
         _overlay_cache_tuple(overlay_values),
+        _overlay_color_from_palette(palette),
     )
     if _bg_cache["key"] == key:
         return _bg_cache["img"].copy()
@@ -250,14 +267,14 @@ def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.
         gd.line([(0, y), (Wc, y)], fill=(0, 0, 0, a))
     photo = Image.alpha_composite(photo, grad)
     photo = _apply_photo_adjustments(photo, adjust_values)
-    photo = _apply_photo_overlay(photo, overlay_values)
+    photo = _apply_photo_overlay(photo, overlay_values, palette=palette)
 
     _bg_cache["key"] = key
     _bg_cache["img"] = photo
     return photo.copy()
 
 
-def compose(layers, canvas_size, font_manager):
+def compose(layers, canvas_size, font_manager, palette=None):
     """
     Compone la publicación a partir de una lista de capas.
 
@@ -298,6 +315,7 @@ def compose(layers, canvas_size, font_manager):
                 offset_y=layer.get("offset_y", 0.5),
                 adjust=layer.get("adjust"),
                 overlay=layer.get("overlay"),
+                palette=palette,
             )
             if opacity < 1.0:
                 r, g, b, a = bg.split()

@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from dcpub.fonts import FontManager
+from dcpub.presets.palette import PALETA_LEGACY, PALETA_PRINCIPAL
 from dcpub.render import compose
 
 
@@ -72,6 +73,20 @@ class TestPhotoAdjustments(unittest.TestCase):
         self._assert_distinct_from_neutral(
             overlay={"top_grad": True, "strength": 0.7}
         )
+
+    def test_overlay_uses_active_palette_color(self):
+        layers = [{
+            "type": "photo",
+            "src": str(self.photo_path),
+            "overlay": {"bottom_grad": True, "strength": 0.8},
+        }]
+        img_principal, _ = compose(
+            layers, (120, 120), self.font_manager, palette=PALETA_PRINCIPAL
+        )
+        img_legacy, _ = compose(
+            layers, (120, 120), self.font_manager, palette=PALETA_LEGACY
+        )
+        self.assertNotEqual(list(img_principal.getdata()), list(img_legacy.getdata()))
 
 
 if __name__ == "__main__":
