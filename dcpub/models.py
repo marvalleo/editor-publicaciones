@@ -114,12 +114,14 @@ class Slide:
     format: dict = field(default_factory=_default_format)
     layout_tag: str | None = None
     layers: list = field(default_factory=list)
+    extra: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
             "format": dict(self.format),
             "layout_tag": self.layout_tag,
             "layers": [layer.to_dict() for layer in self.layers],
+            "extra": dict(self.extra),
         }
 
     @classmethod
@@ -128,6 +130,7 @@ class Slide:
             format=dict(data["format"]),
             layout_tag=data.get("layout_tag"),
             layers=[layer_from_dict(l) for l in data.get("layers", [])],
+            extra=dict(data.get("extra", {})),
         )
 
 

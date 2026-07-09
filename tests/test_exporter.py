@@ -7,8 +7,8 @@ from pathlib import Path
 from PIL import Image
 
 from dcpub.fonts import FontManager
-from dcpub.models import crear_proyecto_por_defecto
-from dcpub.exporter import export_image, _slugify
+from dcpub.models import Project, crear_slide_por_defecto, crear_proyecto_por_defecto
+from dcpub.exporter import Exporter, export_image, _slugify
 
 
 class TestSlugify(unittest.TestCase):
@@ -68,6 +68,60 @@ class TestExportImage(unittest.TestCase):
                                  fmt="png", max_side=500)
         with Image.open(out_path) as img:
             self.assertEqual(max(img.size), 500)
+
+
+class TestExporterExportarTodas(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self._tmpdir.name)
+        self.project = Project(name="Carrusel Demo")
+        self.project.slides = []
+        for i, color in enumerate([(120, 140, 90), (80, 100, 140), (160, 100, 80)], start=1):
+            photo_path = self.tmp_path / f"{i:02d}.jpg"
+            Image.new("RGB", (800, 600), color).save(photo_path)
+            self.project.slides.append(
+                crear_slide_por_defecto(
+                    photo_path=str(photo_path),
+                    titulo=f"Lámina {i}",
+                    subtitulo="Subtítulo",
+                    descripcion=f"Descripción {i}",
+                    formato={"name": "test_vertical", "w": 400, "h": 500},
+                )
+            )
+        self.exporter = Exporter(FontManager(), max_side=500)
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_exportar_todas_genera_un_archivo_por_lamina(self):
+        dest = self.tmp_path / "salida"
+
+        paths = self.exporter.exportar_todas(self.project, dest)
+
+        self.assertEqual(len(paths), 3)
+        self.assertTrue(all(path.exists() for path in paths))
+
+    def test_exportar_todas_usa_nombre_con_indice_y_fecha(self):
+        dest = self.tmp_path / "salida"
+
+        paths = self.exporter.exportar_todas(self.project, dest)
+
+        nombres = [path.name for path in paths]
+        self.assertRegex(nombres[0], r"^Carrusel_Demo_01_\d{8}_\d{6}\.png$")
+        self.assertRegex(nombres[1], r"^Carrusel_Demo_02_\d{8}_\d{6}\.png$")
+        self.assertRegex(nombres[2], r"^Carrusel_Demo_03_\d{8}_\d{6}\.png$")
+
+    def test_exportar_todas_renderiza_contenido_de_cada_lamina(self):
+        dest = self.tmp_path / "salida"
+
+        paths = self.exporter.exportar_todas(self.project, dest)
+
+        with Image.open(paths[0]) as img_1, Image.open(paths[1]) as img_2, Image.open(paths[2]) as img_3:
+            self.assertEqual(max(img_1.size), 500)
+            self.assertEqual(max(img_2.size), 500)
+            self.assertEqual(max(img_3.size), 500)
+            self.assertNotEqual(img_1.getpixel((10, 10)), img_2.getpixel((10, 10)))
+            self.assertNotEqual(img_2.getpixel((10, 10)), img_3.getpixel((10, 10)))
 
 
 if __name__ == "__main__":
