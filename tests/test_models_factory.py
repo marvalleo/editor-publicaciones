@@ -2,7 +2,15 @@
 
 import unittest
 
-from dcpub.models import crear_proyecto_por_defecto
+from dcpub.models import crear_proyecto_por_defecto, crear_slide_por_defecto
+
+
+def _sin_ids(slide_dict):
+    data = dict(slide_dict)
+    data["layers"] = [dict(layer) for layer in slide_dict["layers"]]
+    for layer in data["layers"]:
+        layer.pop("id", None)
+    return data
 
 
 class TestFactory(unittest.TestCase):
@@ -52,6 +60,30 @@ class TestFactory(unittest.TestCase):
     def test_default_photo_path_is_empty_string(self):
         project = crear_proyecto_por_defecto()
         self.assertEqual(project.slides[0].layers[0].src, "")
+
+    def test_crear_slide_por_defecto_usa_textos_custom(self):
+        slide = crear_slide_por_defecto(
+            photo_path="custom.jpg",
+            titulo="Titulo custom",
+            subtitulo="Subtitulo custom",
+            descripcion="Descripcion custom",
+        )
+        by_name = {layer.name: layer for layer in slide.layers}
+        self.assertEqual(by_name["Foto"].src, "custom.jpg")
+        self.assertEqual(by_name["Título"].text, "Titulo custom")
+        self.assertEqual(by_name["Subtítulo"].text, "Subtitulo custom")
+        self.assertEqual(by_name["Descripción"].text, "Descripcion custom")
+
+    def test_crear_slide_por_defecto_usa_formato_custom(self):
+        formato = {"name": "custom", "w": 800, "h": 1000}
+        slide = crear_slide_por_defecto(formato=formato)
+        self.assertEqual(slide.format, formato)
+        self.assertIsNot(slide.format, formato)
+
+    def test_crear_slide_por_defecto_default_equivale_a_proyecto_default(self):
+        project = crear_proyecto_por_defecto("foto.jpg")
+        slide = crear_slide_por_defecto("foto.jpg")
+        self.assertEqual(_sin_ids(slide.to_dict()), _sin_ids(project.slides[0].to_dict()))
 
     def test_round_trip_preserves_full_project(self):
         from dcpub.models import Project

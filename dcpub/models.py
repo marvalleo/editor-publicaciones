@@ -22,6 +22,8 @@ DEFAULT_PHOTO_OVERLAY = {
     "strength": 0.0,
 }
 
+DEFAULT_FORMAT = {"name": "feed_4x5", "w": 1080, "h": 1350}
+
 
 def _short_id() -> str:
     return uuid.uuid4().hex[:8]
@@ -33,6 +35,10 @@ def _photo_adjust_defaults() -> dict:
 
 def _photo_overlay_defaults() -> dict:
     return dict(DEFAULT_PHOTO_OVERLAY)
+
+
+def _default_format() -> dict:
+    return dict(DEFAULT_FORMAT)
 
 
 @dataclass
@@ -105,7 +111,7 @@ def layer_from_dict(data: dict) -> Layer:
 
 @dataclass
 class Slide:
-    format: dict = field(default_factory=lambda: {"name": "feed_4x5", "w": 1080, "h": 1350})
+    format: dict = field(default_factory=_default_format)
     layout_tag: str | None = None
     layers: list = field(default_factory=list)
 
@@ -129,7 +135,7 @@ class Slide:
 class Project:
     version: int = 1
     name: str = "Proyecto sin título"
-    default_format: dict = field(default_factory=lambda: {"name": "feed_4x5", "w": 1080, "h": 1350})
+    default_format: dict = field(default_factory=_default_format)
     palette: dict = field(default_factory=lambda: {
         "verde": list(VERDE),
         "blanco": list(BLANCO),
@@ -160,19 +166,32 @@ class Project:
         )
 
 
-def crear_proyecto_por_defecto(photo_path: str = "") -> Project:
-    """Crea el proyecto por defecto (foto + logo + título + subtítulo + caja) con los valores de v2.0."""
-    slide = Slide()
+def crear_slide_por_defecto(
+    photo_path: str = "",
+    titulo: str = "Tu título aquí",
+    subtitulo: str = "frase secundaria",
+    descripcion: str = "",
+    formato: dict | None = None,
+) -> Slide:
+    """Crea una lámina por defecto (foto + logo + título + subtítulo + caja)."""
+    slide = Slide(format=dict(formato) if formato is not None else _default_format())
     slide.layers = [
-        PhotoLayer(name="Foto", z=0, x=0.0, y=0.0, w=1.0, h=1.0, src=photo_path, offset_x=0.5, offset_y=0.5),
-        LogoLayer(name="Logo", z=1, x=0.40, y=0.022, w=0.20, h=0.20, src=str(LOGO_FILE)),
-        TextLayer(name="Título", z=2, x=0.055, y=0.42, role="title", size=0.087,
-                  text="Tu título aquí"),
-        TextLayer(name="Subtítulo", z=3, x=0.50, y=0.55, role="subtitle", size=0.050,
-                  text="frase secundaria"),
-        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808, size=0.033,
-                 text="", icon="planta"),
+        PhotoLayer(name="Foto", z=0, x=0.0, y=0.0, w=1.0, h=1.0,
+                   src=photo_path, offset_x=0.5, offset_y=0.5),
+        LogoLayer(name="Logo", z=1, x=0.40, y=0.022, w=0.20, h=0.20,
+                  src=str(LOGO_FILE)),
+        TextLayer(name="Título", z=2, x=0.055, y=0.42, role="title",
+                  size=0.087, text=titulo),
+        TextLayer(name="Subtítulo", z=3, x=0.50, y=0.55,
+                  role="subtitle", size=0.050, text=subtitulo),
+        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808,
+                 size=0.033, text=descripcion, icon="planta"),
     ]
+    return slide
+
+
+def crear_proyecto_por_defecto(photo_path: str = "") -> Project:
+    """Crea el proyecto por defecto con una lámina de marca inicial."""
     project = Project()
-    project.slides = [slide]
+    project.slides = [crear_slide_por_defecto(photo_path)]
     return project
