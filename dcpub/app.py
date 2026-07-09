@@ -163,6 +163,8 @@ class App(tk.Tk):
         self._guides = []            # líneas guía activas durante un arrastre, [(tipo,pos_px), ...]
         self._adjust_expanded = False  # colapsado por defecto
         self._photo_pan = None       # datos del arrastre de encuadre en curso, o None
+        self._wheel_zoom_start = None  # zoom al iniciar un gesto de rueda, para el undo agrupado
+        self._wheel_zoom_job = None
 
         from .commands import CommandStack
         self.commands = CommandStack(on_change=self._on_commands_changed)
@@ -217,6 +219,7 @@ class App(tk.Tk):
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Configure>", lambda e: self._schedule_render())
+        self.canvas.bind("<MouseWheel>", self._on_photo_wheel)
 
         self._hint_id = self.canvas.create_text(
             10, 10, anchor="nw", fill="#666", font=("Segoe UI", 12),
@@ -1591,6 +1594,44 @@ class App(tk.Tk):
         self._resize = None
         self._guides = []
         self._render_now()
+
+    def _on_photo_wheel(self, event):
+        photo_layer = self._layer_by_kind("photo")
+        if photo_layer is None or photo_layer.locked:
+            return
+        bb_photo = self._last_bboxes.get(self._bbox_key_for_layer(photo_layer))
+        if not bb_photo:
+            return
+        ix, iy = self._canvas_to_img(event.x, event.y)
+        if not (bb_photo[0] <= ix <= bb_photo[2] and bb_photo[1] <= iy <= bb_photo[3]):
+            return
+
+        step = 0.1 if event.delta > 0 else -0.1
+        old_zoom = photo_layer.zoom
+        new_zoom = round(min(3.0, max(1.0, old_zoom + step)), 4)
+        if new_zoom == old_zoom:
+            return
+
+        if self._wheel_zoom_start is None:
+            self._wheel_zoom_start = old_zoom
+        photo_layer.zoom = new_zoom
+        self._sync_sliders()
+        self._render_now()
+
+        if self._wheel_zoom_job is not None:
+            self.after_cancel(self._wheel_zoom_job)
+        self._wheel_zoom_job = self.after(400, self._commit_wheel_zoom)
+
+    def _commit_wheel_zoom(self):
+        self._wheel_zoom_job = None
+        if self._wheel_zoom_start is None:
+            return
+        photo_layer = self._layer_by_kind("photo")
+        old_zoom = self._wheel_zoom_start
+        self._wheel_zoom_start = None
+        if photo_layer is not None and photo_layer.zoom != old_zoom:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(photo_layer, "zoom", old_zoom, photo_layer.zoom))
 
     # ── Guardar / abrir proyecto ────────────────────────────────
     def _save_project(self):
