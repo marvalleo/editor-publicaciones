@@ -123,3 +123,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
 - Tarea 3 (render rama cta nueva): complete (commit 0a4fd80..cc38b76, review clean, 227 tests)
 - Tarea 4 (adaptadores _build_layers_for / Exporter): complete (commit 478b1c7..2892922, review clean, 231 tests)
 - Tarea 5 (migracion automatica de proyectos legado): complete (commit 5c26638..ca9841f, review clean, 235 tests)
+- Tarea 6 (batch_import crea CTALayer real): complete (commit 828d331..3789b43, review clean, 236 tests)
