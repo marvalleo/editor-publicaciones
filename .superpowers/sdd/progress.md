@@ -125,3 +125,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
 - Tarea 5 (migracion automatica de proyectos legado): complete (commit 5c26638..ca9841f, review clean, 235 tests)
 - Tarea 6 (batch_import crea CTALayer real): complete (commit 828d331..3789b43, review clean, 236 tests)
 - Tarea 7 (panel de propiedades reconoce cta + sliders w/h): complete (commit b5500ef..da1a014, review clean, 239 tests)
+- Tarea 8 (selector de color fill/text_color): complete (commit fb412e0..ac7d8ef, review clean, 243 tests)
