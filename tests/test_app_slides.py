@@ -204,5 +204,119 @@ class TestCopyStyleToSlide(unittest.TestCase):
         self.assertEqual(destino.layers[2].x, x_original)
 
 
+class TestLayerByKindWithSlideParam(unittest.TestCase):
+    def test_defaults_to_self_slide(self):
+        app = _make_app_with_two_slides()
+        titulo = App._layer_by_kind(app, "title")
+        self.assertEqual(titulo.text, "Titulo lamina 1")
+
+    def test_accepts_explicit_slide(self):
+        app = _make_app_with_two_slides()
+        segunda = app.project.slides[1]
+        titulo = App._layer_by_kind(app, "title", segunda)
+        self.assertEqual(titulo.text, "Titulo lamina 2")
+
+
+class TestCanvasSizeForWithFmt(unittest.TestCase):
+    def test_defaults_to_self_slide_format(self):
+        app = _make_app_with_two_slides()
+        app.slide.format = {"name": "x", "w": 1080, "h": 1350}
+        w, h = App._canvas_size_for(app, 400)
+        self.assertEqual(h, 400)
+        self.assertEqual(w, round(400 * 1080 / 1350))
+
+    def test_accepts_explicit_format(self):
+        app = _make_app_with_two_slides()
+        w, h = App._canvas_size_for(app, 400, {"name": "x", "w": 1000, "h": 1000})
+        self.assertEqual((w, h), (400, 400))
+
+
+class TestBuildLayersFor(unittest.TestCase):
+    def test_other_slide_uses_its_own_layer_text_not_live_widgets(self):
+        app = _make_app_with_two_slides()
+        app.v_photo = _FakeVar("foto-editada-en-pantalla.jpg")
+        app.v_logo = _FakeVar("")
+        app.txt_title = _FakeText("Texto tipeado ahora mismo")
+        app.v_sub = _FakeVar("")
+        app.txt_desc = _FakeText("")
+        app.v_icon = _FakeVar("planta")
+
+        segunda = app.project.slides[1]
+        capas = App._build_layers_for(app, segunda)
+        titulo = next(c for c in capas if c["type"] == "title")
+        self.assertEqual(titulo["text"], "Titulo lamina 2")
+
+    def test_current_slide_still_uses_live_widgets(self):
+        app = _make_app_with_two_slides()
+        app.v_photo = _FakeVar("")
+        app.v_logo = _FakeVar("")
+        app.txt_title = _FakeText("Texto tipeado ahora mismo")
+        app.v_sub = _FakeVar("")
+        app.txt_desc = _FakeText("")
+        app.v_icon = _FakeVar("planta")
+
+        capas = App._build_layers_for(app, app.slide)
+        titulo = next(c for c in capas if c["type"] == "title")
+        self.assertEqual(titulo["text"], "Texto tipeado ahora mismo")
+
+    def test_build_layers_delegates_to_build_layers_for_current_slide(self):
+        app = _make_app_with_two_slides()
+        app.v_photo = _FakeVar("")
+        app.v_logo = _FakeVar("")
+        app.txt_title = _FakeText("Via _build_layers")
+        app.v_sub = _FakeVar("")
+        app.txt_desc = _FakeText("")
+        app.v_icon = _FakeVar("planta")
+
+        capas = App._build_layers(app)
+        titulo = next(c for c in capas if c["type"] == "title")
+        self.assertEqual(titulo["text"], "Via _build_layers")
+
+
+class TestSharedLogo(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        self.app.v_photo = _FakeVar("")
+        self.app.v_logo = _FakeVar("")
+        self.app.txt_title = _FakeText("")
+        self.app.v_sub = _FakeVar("")
+        self.app.txt_desc = _FakeText("")
+        self.app.v_icon = _FakeVar("planta")
+        self.app.v_logo_shared = _FakeVar(False)
+        self.app._set_dirty = lambda value: None
+        self.app._schedule_render = lambda: None
+
+    def test_toggle_on_writes_shared_logo_from_current_slide(self):
+        self.app.v_logo_shared.set(True)
+        App._toggle_shared_logo(self.app)
+        self.assertIn("logo", self.app.project.shared)
+        logo_layer = App._layer_by_kind(self.app, "logo")
+        self.assertEqual(self.app.project.shared["logo"]["src"], logo_layer.src)
+
+    def test_toggle_off_clears_shared_logo(self):
+        self.app.v_logo_shared.set(True)
+        App._toggle_shared_logo(self.app)
+        self.app.v_logo_shared.set(False)
+        App._toggle_shared_logo(self.app)
+        self.assertNotIn("logo", self.app.project.shared)
+
+    def test_build_layers_uses_shared_logo_for_any_slide(self):
+        self.app.v_logo_shared.set(True)
+        App._toggle_shared_logo(self.app)
+        self.app.project.shared["logo"]["src"] = "logo-compartido.png"
+
+        segunda = self.app.project.slides[1]
+        capas = App._build_layers_for(self.app, segunda)
+        logo = next(c for c in capas if c["type"] == "logo")
+        self.assertEqual(logo["src"], "logo-compartido.png")
+
+    def test_build_layers_uses_own_logo_when_not_shared(self):
+        segunda = self.app.project.slides[1]
+        logo_propio = App._layer_by_kind(self.app, "logo", segunda)
+        capas = App._build_layers_for(self.app, segunda)
+        logo = next(c for c in capas if c["type"] == "logo")
+        self.assertEqual(logo["src"], logo_propio.src)
+
+
 if __name__ == "__main__":
     unittest.main()

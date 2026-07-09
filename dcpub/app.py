@@ -232,7 +232,7 @@ class App(tk.Tk):
         tk.Label(left, text="Logo", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         row_logo = tk.Frame(left, bg=PANEL)
-        row_logo.pack(fill=tk.X, pady=(0, 8), **pad)
+        row_logo.pack(fill=tk.X, pady=(0, 4), **pad)
         e_logo = tk.Entry(row_logo, textvariable=self.v_logo, bg=FIELD, fg=TEXT,
                           insertbackground="white", relief="flat", bd=4,
                           font=("Segoe UI", 9))
@@ -240,6 +240,12 @@ class App(tk.Tk):
         e_logo.bind("<KeyRelease>", lambda e: self._on_logo_direct_edit())
         tk.Button(row_logo, text="…", bg="#3d3d3d", fg=TEXT, relief="flat", padx=8,
                   command=self._browse_logo).pack(side=tk.LEFT, padx=(4, 0))
+
+        self.v_logo_shared = tk.BooleanVar(value="logo" in self.project.shared)
+        tk.Checkbutton(left, text="Usar en todo el carrusel", variable=self.v_logo_shared,
+                        bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                        activeforeground=TEXT, font=("Segoe UI", 8),
+                        command=self._toggle_shared_logo).pack(anchor="w", pady=(0, 8), **pad)
 
         # Título (multilínea)
         tk.Label(left, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
@@ -672,10 +678,12 @@ class App(tk.Tk):
         self._render_now()
 
     # ── Puente entre el vocabulario del render y el modelo ─────
-    def _layer_by_kind(self, kind):
+    def _layer_by_kind(self, kind, slide=None):
         """Traduce entre el vocabulario del render ("photo"/"logo"/"title"/"sub"/"desc")
-        y los tipos/roles reales de dcpub.models (Layer.type, TextLayer.role)."""
-        for layer in self.slide.layers:
+        y los tipos/roles reales de dcpub.models (Layer.type, TextLayer.role).
+        Busca en `slide` si se pasa, o en la lámina activa (self.slide) si no."""
+        target = slide if slide is not None else self.slide
+        for layer in target.layers:
             if kind == "photo" and layer.type == "photo":
                 return layer
             if kind == "logo" and layer.type == "logo":
@@ -899,6 +907,7 @@ class App(tk.Tk):
         logo_layer = self._layer_by_kind("logo")
         if logo_layer is not None:
             logo_layer.src = self.v_logo.get().strip()
+        self._sync_shared_logo_if_active()
         self._on_direct_edit()
 
     def _default_logo_src(self):
@@ -906,6 +915,32 @@ class App(tk.Tk):
         if logo_layer is not None and logo_layer.src:
             return logo_layer.src
         return str(LOGO_FILE)
+
+    def _toggle_shared_logo(self):
+        """Escribe o borra project.shared["logo"] según el estado del checkbox
+        "Usar en todo el carrusel". Al activar, toma como valor inicial el
+        logo de la lámina activa."""
+        if self.v_logo_shared.get():
+            logo_layer = self._layer_by_kind("logo")
+            self.project.shared["logo"] = {
+                "src": logo_layer.src, "x": logo_layer.x, "y": logo_layer.y,
+                "w": logo_layer.w, "h": logo_layer.h,
+            }
+        else:
+            self.project.shared.pop("logo", None)
+        self._set_dirty(True)
+        self._schedule_render()
+
+    def _sync_shared_logo_if_active(self):
+        """Si el logo compartido está activo, actualiza su valor con el logo
+        actual de la lámina activa (para que un cambio de archivo se
+        propague a todo el carrusel)."""
+        if "logo" in self.project.shared:
+            logo_layer = self._layer_by_kind("logo")
+            self.project.shared["logo"] = {
+                "src": logo_layer.src, "x": logo_layer.x, "y": logo_layer.y,
+                "w": logo_layer.w, "h": logo_layer.h,
+            }
 
     def _set_dirty(self, value):
         self._dirty = value
@@ -1109,10 +1144,12 @@ class App(tk.Tk):
         """Restaura el texto del combobox al formato activo (p.ej. si se cancela el diálogo)."""
         self.v_format.set(self._format_label_for(self.slide.format))
 
-    def _canvas_size_for(self, max_side):
-        """Calcula (ancho, alto) en px del lienzo para el formato actual, con el
-        lado mayor igual a max_side, manteniendo la proporción del formato."""
-        fw, fh = self.slide.format["w"], self.slide.format["h"]
+    def _canvas_size_for(self, max_side, fmt=None):
+        """Calcula (ancho, alto) en px del lienzo para `fmt` (o el formato de
+        la lámina activa si no se pasa), con el lado mayor igual a max_side,
+        manteniendo la proporción del formato."""
+        formato = fmt if fmt is not None else self.slide.format
+        fw, fh = formato["w"], formato["h"]
         if fh >= fw:
             h = max_side
             w = max(1, round(max_side * fw / fh))
@@ -1143,45 +1180,66 @@ class App(tk.Tk):
             logo_layer = self._layer_by_kind("logo")
             if logo_layer is not None:
                 logo_layer.src = path
+            self._sync_shared_logo_if_active()
             self._set_dirty(True)
             self._schedule_render()
 
     # ── Capas actuales: adapta el modelo al dict plano que espera render.py ──
-    def _build_layers(self):
+    def _build_layers_for(self, slide):
+        """Adapta las capas de `slide` al dict plano que espera render.compose().
+        Si `slide` es la lámina activa (self.slide), las capas de foto/logo/
+        título/subtítulo/descripción reflejan los widgets en pantalla en vez
+        del valor guardado en el modelo (para que la vista previa muestre lo
+        que se está tipeando antes de sincronizarlo con _sync_text_to_layers).
+        Si el proyecto tiene un logo compartido activo (project.shared["logo"]),
+        ese valor pisa el logo propio de la lámina, sea cual sea."""
+        es_activa = slide is self.slide
+        shared_logo = self.project.shared.get("logo")
         layers = []
-        for layer in self.slide.layers:
+        for layer in slide.layers:
             if not layer.visible:
                 continue
             if layer.type == "photo":
-                src = self.v_photo.get().strip() if layer is self._layer_by_kind("photo") else layer.src
+                src = (self.v_photo.get().strip()
+                       if es_activa and layer is self._layer_by_kind("photo", slide) else layer.src)
                 layers.append({"type": "photo", "key": layer.id, "src": src,
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
                                 "offset_y": layer.offset_y, "opacity": layer.opacity})
             elif layer.type == "logo":
-                src = self.v_logo.get().strip() if layer is self._layer_by_kind("logo") else layer.src
-                layers.append({"type": "logo", "key": layer.id,
-                                "src": src,
-                                "x": layer.x, "y": layer.y, "size": layer.w,
-                                "opacity": layer.opacity})
+                if shared_logo is not None:
+                    layers.append({"type": "logo", "key": layer.id,
+                                    "src": shared_logo["src"],
+                                    "x": shared_logo["x"], "y": shared_logo["y"],
+                                    "size": shared_logo["w"], "opacity": layer.opacity})
+                else:
+                    src = (self.v_logo.get().strip()
+                           if es_activa and layer is self._layer_by_kind("logo", slide) else layer.src)
+                    layers.append({"type": "logo", "key": layer.id, "src": src,
+                                    "x": layer.x, "y": layer.y, "size": layer.w,
+                                    "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "title":
                 text = (self.txt_title.get("1.0", "end-1c")
-                        if layer is self._layer_by_kind("title") else layer.text)
+                        if es_activa and layer is self._layer_by_kind("title", slide) else layer.text)
                 layers.append({"type": "title", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "subtitle":
-                text = self.v_sub.get() if layer is self._layer_by_kind("sub") else layer.text
+                text = (self.v_sub.get()
+                        if es_activa and layer is self._layer_by_kind("sub", slide) else layer.text)
                 layers.append({"type": "sub", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "box":
-                text = (self.txt_desc.get("1.0", "end-1c")
-                        if layer is self._layer_by_kind("desc") else layer.text)
-                icon = self.v_icon.get() if layer is self._layer_by_kind("desc") else layer.icon
+                es_desc_activa = es_activa and layer is self._layer_by_kind("desc", slide)
+                text = self.txt_desc.get("1.0", "end-1c") if es_desc_activa else layer.text
+                icon = self.v_icon.get() if es_desc_activa else layer.icon
                 layers.append({"type": "desc", "key": layer.id, "text": text,
                                 "icon": icon, "x": layer.x, "y": layer.y,
                                 "size": layer.size, "opacity": layer.opacity})
         return layers
+
+    def _build_layers(self):
+        return self._build_layers_for(self.slide)
 
     # ── Render con debounce ────────────────────────────────────
     def _schedule_render(self, delay=50):
