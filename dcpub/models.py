@@ -6,8 +6,33 @@ import uuid
 from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE
 
 
+DEFAULT_PHOTO_ADJUST = {
+    "brightness": 1.0,
+    "contrast": 1.0,
+    "saturation": 1.0,
+    "warmth": 0.0,
+    "sharpness": 1.0,
+    "shadows": 0.0,
+    "vignette": 0.0,
+}
+
+DEFAULT_PHOTO_OVERLAY = {
+    "bottom_grad": False,
+    "top_grad": False,
+    "strength": 0.0,
+}
+
+
 def _short_id() -> str:
     return uuid.uuid4().hex[:8]
+
+
+def _photo_adjust_defaults() -> dict:
+    return dict(DEFAULT_PHOTO_ADJUST)
+
+
+def _photo_overlay_defaults() -> dict:
+    return dict(DEFAULT_PHOTO_OVERLAY)
 
 
 @dataclass
@@ -37,6 +62,8 @@ class PhotoLayer(Layer):
     zoom: float = 1.0
     offset_x: float = 0.0
     offset_y: float = 0.0
+    adjust: dict = field(default_factory=_photo_adjust_defaults)
+    overlay: dict = field(default_factory=_photo_overlay_defaults)
 
 
 @dataclass

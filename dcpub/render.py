@@ -2,11 +2,27 @@
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE
 
 _bg_cache = {"key": None, "img": None}
+
+DEFAULT_ADJUST = {
+    "brightness": 1.0,
+    "contrast": 1.0,
+    "saturation": 1.0,
+    "warmth": 0.0,
+    "sharpness": 1.0,
+    "shadows": 0.0,
+    "vignette": 0.0,
+}
+
+DEFAULT_OVERLAY = {
+    "bottom_grad": False,
+    "top_grad": False,
+    "strength": 0.0,
+}
 
 
 def draw_icon(draw, x, y, size, icon_type, color):
@@ -72,11 +88,143 @@ def _apply_opacity(rgba_color, opacity):
     return (r, g, b, a)
 
 
-def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5):
+def _clamp(value, min_value, max_value):
+    return max(min_value, min(max_value, value))
+
+
+def _normalized_adjust(adjust):
+    values = dict(DEFAULT_ADJUST)
+    if adjust:
+        values.update(adjust)
+    return values
+
+
+def _normalized_overlay(overlay):
+    values = dict(DEFAULT_OVERLAY)
+    if overlay:
+        values.update(overlay)
+    return values
+
+
+def _adjust_cache_tuple(values):
+    return (
+        round(float(values["brightness"]), 4),
+        round(float(values["contrast"]), 4),
+        round(float(values["saturation"]), 4),
+        round(float(values["warmth"]), 4),
+        round(float(values["sharpness"]), 4),
+        round(float(values["shadows"]), 4),
+        round(float(values["vignette"]), 4),
+    )
+
+
+def _overlay_cache_tuple(values):
+    return (
+        bool(values["bottom_grad"]),
+        bool(values["top_grad"]),
+        round(float(values["strength"]), 4),
+    )
+
+
+def _apply_warmth(photo, warmth):
+    warmth = _clamp(float(warmth), -1.0, 1.0)
+    if warmth == 0.0:
+        return photo
+    r, g, b, a = photo.split()
+    shift = int(45 * warmth)
+    r = r.point(lambda px, s=shift: _clamp(px + s, 0, 255))
+    b = b.point(lambda px, s=shift: _clamp(px - s, 0, 255))
+    return Image.merge("RGBA", (r, g, b, a))
+
+
+def _apply_shadows(photo, amount):
+    amount = _clamp(float(amount), -1.0, 1.0)
+    if amount == 0.0:
+        return photo
+    rgb = photo.convert("RGB")
+    gray = rgb.convert("L")
+    mask = gray.point(lambda px: max(0, 180 - px))
+    mask = ImageEnhance.Contrast(mask).enhance(1.8).filter(ImageFilter.GaussianBlur(2))
+    if amount > 0:
+        adjusted = ImageEnhance.Brightness(rgb).enhance(1.0 + amount)
+    else:
+        adjusted = ImageEnhance.Brightness(rgb).enhance(1.0 + amount * 0.5)
+    blended = Image.composite(adjusted, rgb, mask)
+    blended.putalpha(photo.getchannel("A"))
+    return blended
+
+
+def _apply_vignette(photo, amount):
+    amount = _clamp(float(amount), 0.0, 1.0)
+    if amount == 0.0:
+        return photo
+    w, h = photo.size
+    cx, cy = w / 2, h / 2
+    max_dist = (cx ** 2 + cy ** 2) ** 0.5
+    alpha = Image.new("L", (w, h), 0)
+    pixels = alpha.load()
+    for y in range(h):
+        for x in range(w):
+            dist = (((x - cx) ** 2 + (y - cy) ** 2) ** 0.5) / max_dist
+            edge = max(0.0, (dist - 0.35) / 0.65)
+            pixels[x, y] = int(210 * amount * edge)
+    blur = max(1, int(min(w, h) * 0.03))
+    dark = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    dark.putalpha(alpha.filter(ImageFilter.GaussianBlur(blur)))
+    return Image.alpha_composite(photo, dark)
+
+
+def _apply_photo_adjustments(photo, adjust):
+    values = _normalized_adjust(adjust)
+    if values["brightness"] != 1.0:
+        photo = ImageEnhance.Brightness(photo).enhance(float(values["brightness"]))
+    if values["contrast"] != 1.0:
+        photo = ImageEnhance.Contrast(photo).enhance(float(values["contrast"]))
+    if values["saturation"] != 1.0:
+        photo = ImageEnhance.Color(photo).enhance(float(values["saturation"]))
+    photo = _apply_warmth(photo, values["warmth"])
+    if values["sharpness"] != 1.0:
+        photo = ImageEnhance.Sharpness(photo).enhance(float(values["sharpness"]))
+    photo = _apply_shadows(photo, values["shadows"])
+    photo = _apply_vignette(photo, values["vignette"])
+    return photo
+
+
+def _apply_photo_overlay(photo, overlay):
+    values = _normalized_overlay(overlay)
+    strength = _clamp(float(values["strength"]), 0.0, 1.0)
+    if strength == 0.0 or not (values["bottom_grad"] or values["top_grad"]):
+        return photo
+    w, h = photo.size
+    grad = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(grad)
+    max_alpha = int(180 * strength)
+    if values["bottom_grad"]:
+        start = int(h * 0.35)
+        for y in range(start, h):
+            alpha = int(max_alpha * ((y - start) / max(1, h - start)))
+            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+    if values["top_grad"]:
+        end = int(h * 0.45)
+        for y in range(0, end):
+            alpha = int(max_alpha * (1.0 - y / max(1, end)))
+            draw.line([(0, y), (w, y)], fill=(0, 0, 0, alpha))
+    return Image.alpha_composite(photo, grad)
+
+
+def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5,
+                    adjust=None, overlay=None):
     """Recorta la foto tipo "cover" al tamaño exacto del lienzo (sin deformar),
     aplicando zoom y posición de recorte, más el gradiente inferior. Cacheado."""
     Wc, Hc = canvas_size
-    key = (str(photo_path), Wc, Hc, round(zoom, 4), round(offset_x, 4), round(offset_y, 4))
+    adjust_values = _normalized_adjust(adjust)
+    overlay_values = _normalized_overlay(overlay)
+    key = (
+        str(photo_path), Wc, Hc, round(zoom, 4),
+        round(offset_x, 4), round(offset_y, 4),
+        _adjust_cache_tuple(adjust_values),
+        _overlay_cache_tuple(overlay_values),
+    )
     if _bg_cache["key"] == key:
         return _bg_cache["img"].copy()
 
@@ -101,6 +249,8 @@ def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.
         a = int(150 * min(1.0, (y - start) / max(1, (Hc - start))))
         gd.line([(0, y), (Wc, y)], fill=(0, 0, 0, a))
     photo = Image.alpha_composite(photo, grad)
+    photo = _apply_photo_adjustments(photo, adjust_values)
+    photo = _apply_photo_overlay(photo, overlay_values)
 
     _bg_cache["key"] = key
     _bg_cache["img"] = photo
@@ -146,6 +296,8 @@ def compose(layers, canvas_size, font_manager):
                 zoom=layer.get("zoom", 1.0),
                 offset_x=layer.get("offset_x", 0.5),
                 offset_y=layer.get("offset_y", 0.5),
+                adjust=layer.get("adjust"),
+                overlay=layer.get("overlay"),
             )
             if opacity < 1.0:
                 r, g, b, a = bg.split()

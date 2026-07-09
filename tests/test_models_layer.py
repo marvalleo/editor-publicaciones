@@ -21,6 +21,16 @@ class TestLayerSubclasses(unittest.TestCase):
         self.assertEqual(p.zoom, 1.0)
         self.assertEqual(p.offset_x, 0.0)
         self.assertEqual(p.offset_y, 0.0)
+        self.assertEqual(p.adjust["brightness"], 1.0)
+        self.assertEqual(p.adjust["contrast"], 1.0)
+        self.assertEqual(p.adjust["saturation"], 1.0)
+        self.assertEqual(p.adjust["warmth"], 0.0)
+        self.assertEqual(p.adjust["sharpness"], 1.0)
+        self.assertEqual(p.adjust["shadows"], 0.0)
+        self.assertEqual(p.adjust["vignette"], 0.0)
+        self.assertEqual(p.overlay["bottom_grad"], False)
+        self.assertEqual(p.overlay["top_grad"], False)
+        self.assertEqual(p.overlay["strength"], 0.0)
 
     def test_logo_layer_defaults(self):
         logo = LogoLayer(src="logo.png")
@@ -50,11 +60,25 @@ class TestLayerSubclasses(unittest.TestCase):
 
 class TestLayerFromDict(unittest.TestCase):
     def test_round_trip_preserves_type_and_fields(self):
-        original = PhotoLayer(name="Foto", src="foto.jpg", zoom=1.5)
+        original = PhotoLayer(
+            name="Foto", src="foto.jpg", zoom=1.5,
+            adjust={
+                "brightness": 1.2,
+                "contrast": 1.1,
+                "saturation": 0.8,
+                "warmth": 0.2,
+                "sharpness": 1.4,
+                "shadows": 0.1,
+                "vignette": 0.3,
+            },
+            overlay={"bottom_grad": True, "top_grad": True, "strength": 0.4},
+        )
         restored = layer_from_dict(original.to_dict())
         self.assertIsInstance(restored, PhotoLayer)
         self.assertEqual(restored.src, "foto.jpg")
         self.assertEqual(restored.zoom, 1.5)
+        self.assertEqual(restored.adjust, original.adjust)
+        self.assertEqual(restored.overlay, original.overlay)
         self.assertEqual(restored.id, original.id)
 
     def test_round_trip_each_subclass(self):
