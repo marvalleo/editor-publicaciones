@@ -118,6 +118,11 @@ def _center_position(axis, x0, y0, bw, bh, iw, ih):
     return x0, y0
 
 
+def _rgba_to_hex(rgba):
+    r, g, b = rgba[0], rgba[1], rgba[2]
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -167,6 +172,7 @@ class App(tk.Tk):
         self._photo_pan = None       # datos del arrastre de encuadre en curso, o None
         self._wheel_zoom_start = None  # zoom al iniciar un gesto de rueda, para el undo agrupado
         self._wheel_zoom_job = None
+        self._color_alpha_start = None  # valor [r,g,b,a] al iniciar el arrastre del alpha
 
         from .commands import CommandStack
         self.commands = CommandStack(on_change=self._on_commands_changed)
@@ -592,6 +598,8 @@ class App(tk.Tk):
         if kind in ("desc", "cta"):
             self._slider(card, token, "w", "Ancho de la caja", 0.10, 0.95, disabled=disabled)
             self._slider(card, token, "h", "Alto de la caja", 0.03, 0.50, disabled=disabled)
+            self._color_picker(card, layer, "fill", "Color de la caja", disabled=disabled)
+            self._color_picker(card, layer, "text_color", "Color del texto", disabled=disabled)
         self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
         self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
@@ -916,6 +924,73 @@ class App(tk.Tk):
                 self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
             if kind == "logo":
                 self._sync_shared_logo_if_active()
+
+    def _on_color_alpha_press(self, layer, attr):
+        self._color_alpha_start = list(getattr(layer, attr))
+
+    def _on_color_alpha_release(self, layer, attr):
+        if self._color_alpha_start is None:
+            return
+        old_value = self._color_alpha_start
+        self._color_alpha_start = None
+        new_value = list(getattr(layer, attr))
+        if old_value != new_value:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(layer, attr, old_value, new_value))
+
+    def _on_color_alpha_change(self, layer, attr, alpha_var, swatch):
+        value = list(getattr(layer, attr))
+        while len(value) < 4:
+            value.append(255)
+        value[3] = int(alpha_var.get())
+        setattr(layer, attr, value)
+        swatch.config(bg=_rgba_to_hex(value))
+        self._schedule_render()
+
+    def _pick_color(self, layer, attr, swatch):
+        from tkinter import colorchooser
+        from .commands import PropertyChangeCommand
+        old_value = list(getattr(layer, attr))
+        _, hex_color = colorchooser.askcolor(color=_rgba_to_hex(old_value),
+                                              title="Elegir color")
+        if hex_color is None:
+            return
+        rgb16 = self.winfo_rgb(hex_color)
+        r, g, b = rgb16[0] // 256, rgb16[1] // 256, rgb16[2] // 256
+        alpha = old_value[3] if len(old_value) > 3 else 255
+        new_value = [r, g, b, alpha]
+        if new_value != old_value:
+            self.commands.push(PropertyChangeCommand(layer, attr, old_value, new_value))
+            swatch.config(bg=_rgba_to_hex(new_value))
+            self._schedule_render()
+
+    def _color_picker(self, parent, layer, attr, label, disabled=False):
+        tk.Label(parent, text=label, bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 8)).pack(anchor="w", pady=(4, 0))
+        row = tk.Frame(parent, bg=PANEL)
+        row.pack(fill=tk.X)
+
+        rgba = list(getattr(layer, attr))
+        swatch = tk.Label(row, bg=_rgba_to_hex(rgba), width=3, relief="flat")
+        swatch.pack(side=tk.LEFT, padx=(0, 6))
+
+        state = tk.DISABLED if disabled else tk.NORMAL
+        tk.Button(row, text="Elegir color…", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), state=state,
+                  command=lambda: self._pick_color(layer, attr, swatch)).pack(side=tk.LEFT)
+
+        alpha_value = rgba[3] if len(rgba) > 3 else 255
+        alpha_var = tk.IntVar(value=alpha_value)
+        alpha_scale = ttk.Scale(
+            row, from_=0, to=255, variable=alpha_var, orient=tk.HORIZONTAL,
+            style="Brand.Horizontal.TScale", state=state,
+            command=lambda _v, l=layer, a=attr, v=alpha_var, s=swatch:
+                self._on_color_alpha_change(l, a, v, s))
+        alpha_scale.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0))
+        alpha_scale.bind("<ButtonPress-1>",
+                          lambda e, l=layer, a=attr: self._on_color_alpha_press(l, a))
+        alpha_scale.bind("<ButtonRelease-1>",
+                          lambda e, l=layer, a=attr: self._on_color_alpha_release(l, a))
 
     def _sync_sliders(self):
         """Refleja el estado actual en los controles del panel activo, sin disparar render."""

@@ -136,5 +136,39 @@ class TestSizeRangeAndLabelsIncludeCTA(unittest.TestCase):
         self.assertIn("cta", LABELS)
 
 
+class TestRgbaToHex(unittest.TestCase):
+    def test_converts_rgb_ignoring_alpha(self):
+        from dcpub.app import _rgba_to_hex
+        self.assertEqual(_rgba_to_hex([255, 0, 128, 200]), "#ff0080")
+
+    def test_handles_three_channel_input(self):
+        from dcpub.app import _rgba_to_hex
+        self.assertEqual(_rgba_to_hex([0, 0, 0]), "#000000")
+
+
+class TestColorAlphaCommit(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import CTALayer
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app._color_alpha_start = None
+        self.app._schedule_render = lambda: None
+        self.layer = CTALayer(fill=[10, 20, 30, 100])
+
+    def test_alpha_press_then_release_pushes_one_command(self):
+        App._on_color_alpha_press(self.app, self.layer, "fill")
+        self.layer.fill = [10, 20, 30, 250]
+        App._on_color_alpha_release(self.app, self.layer, "fill")
+
+        self.assertEqual(len(self.app.commands._undo_stack), 1)
+        self.app.commands.undo()
+        self.assertEqual(self.layer.fill, [10, 20, 30, 100])
+
+    def test_release_without_press_does_nothing(self):
+        App._on_color_alpha_release(self.app, self.layer, "fill")
+        self.assertEqual(len(self.app.commands._undo_stack), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
