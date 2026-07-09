@@ -99,3 +99,17 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
   agrego test que llama _commit_wheel_zoom directo y verifica un solo PropertyChangeCommand.
 - Tarea 9 (verificacion headless de cierre): complete (commit 008a231..f4a67d8, review clean,
   216 tests, HEADLESS_OK)
+
+# Revision final de rama completa (Fase 3 foto base)
+
+Revision final: sin hallazgos Critical ni Important. Confirmado que el fix de Tarea 1
+(adjust/overlay llegan al render por referencia) sigue vigente tras Tareas 5/7/8; que
+_on_press/_on_drag/_on_release discriminan correctamente entre resize, photo-pan y drag
+normal sin fallthrough; que la regla "la foto nunca se deforma" se respeta en todo el
+codigo nuevo (pan solo escribe offset_x/offset_y, wheel solo escribe zoom); y que
+undo/redo refresca el panel de ajustes correctamente. Notas Minor no bloqueantes: parseo
+de params con punto duplicado en 4 metodos (deuda aceptable, candidato a limpieza cuando
+Fase 4 vuelva a tocar el panel de propiedades); pan+wheel simultaneo (no alcanzable en
+desktop single-pointer). Suite final: 216 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge.
