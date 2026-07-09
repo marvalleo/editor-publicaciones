@@ -120,3 +120,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
 
 - Tarea 1 (modelo: BoxLayer.fill/text_color + CTALayer): complete (commit 162b434..578af3f, review clean, 218 tests)
 - Tarea 2 (render desc configurable con fallback legado): complete (commit 4f26074..2508b15, review clean, 223 tests)
+- Tarea 3 (render rama cta nueva): complete (commit 0a4fd80..cc38b76, review clean, 227 tests)
