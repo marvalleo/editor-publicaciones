@@ -32,5 +32,23 @@ class TestSnapPosition(unittest.TestCase):
         self.assertEqual(guides, [])
 
 
+class TestOffsetDeltaForDrag(unittest.TestCase):
+    def test_dragging_right_decreases_offset_x(self):
+        from dcpub.app import _offset_delta_for_drag
+        d_ox, d_oy = _offset_delta_for_drag(dx_img=50, dy_img=0, excess_x=500, excess_y=500)
+        self.assertLess(d_ox, 0)
+        self.assertEqual(d_oy, 0)
+
+    def test_dragging_left_increases_offset_x(self):
+        from dcpub.app import _offset_delta_for_drag
+        d_ox, _ = _offset_delta_for_drag(dx_img=-50, dy_img=0, excess_x=500, excess_y=500)
+        self.assertGreater(d_ox, 0)
+
+    def test_zero_excess_gives_zero_delta(self):
+        from dcpub.app import _offset_delta_for_drag
+        d_ox, d_oy = _offset_delta_for_drag(dx_img=100, dy_img=100, excess_x=0, excess_y=0)
+        self.assertEqual((d_ox, d_oy), (0.0, 0.0))
+
+
 if __name__ == "__main__":
     unittest.main()

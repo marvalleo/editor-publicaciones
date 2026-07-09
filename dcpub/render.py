@@ -228,6 +228,20 @@ def _apply_photo_overlay(photo, overlay, palette=None):
     return Image.alpha_composite(photo, grad)
 
 
+def excess_for_zoom(photo_wh, canvas_wh, zoom):
+    """Devuelve (excess_x, excess_y): cuántos px de la foto escalada sobran
+    más allá del lienzo para el zoom/tamaño dados. Misma matemática que usa
+    _get_background al recortar tipo "cover", expuesta para que la UI pueda
+    traducir un arrastre de mouse a un delta de offset_x/offset_y."""
+    Wp, Hp = photo_wh
+    Wc, Hc = canvas_wh
+    base_scale = max(Wc / Wp, Hc / Hp)
+    scale = base_scale * max(1.0, zoom)
+    Ws = max(Wc, round(Wp * scale))
+    Hs = max(Hc, round(Hp * scale))
+    return (Ws - Wc, Hs - Hc)
+
+
 def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.5,
                     adjust=None, overlay=None, palette=None):
     """Recorta la foto tipo "cover" al tamaño exacto del lienzo (sin deformar),

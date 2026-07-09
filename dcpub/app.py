@@ -96,6 +96,16 @@ def _snap_position(new_x0, new_y0, bw, bh, iw, ih):
     return new_x0, new_y0, guides
 
 
+def _offset_delta_for_drag(dx_img, dy_img, excess_x, excess_y):
+    """Traduce un desplazamiento de mouse (dx_img, dy_img) en px de la
+    imagen de preview a un delta de (offset_x, offset_y) fraccional de la
+    foto. Arrastrar a la derecha/abajo debe revelar contenido a la
+    izquierda/arriba (como panear un mapa), de ahí el signo negativo."""
+    d_ox = (-dx_img / excess_x) if excess_x > 0 else 0.0
+    d_oy = (-dy_img / excess_y) if excess_y > 0 else 0.0
+    return d_ox, d_oy
+
+
 def _center_position(axis, x0, y0, bw, bh, iw, ih):
     """Centra la caja (esquina x0,y0, ancho bw, alto bh) en el eje pedido
     ("x", "y" o "both") dentro del lienzo (iw x ih). Devuelve (x0, y0)."""

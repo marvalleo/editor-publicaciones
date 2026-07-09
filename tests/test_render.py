@@ -367,5 +367,24 @@ class TestApplyOpacity(unittest.TestCase):
         self.assertEqual(_apply_opacity((10, 20, 30, 200), -1.0), (10, 20, 30, 0))
 
 
+class TestExcessForZoom(unittest.TestCase):
+    def test_no_excess_when_photo_matches_canvas_at_zoom_one(self):
+        from dcpub.render import excess_for_zoom
+        excess_x, excess_y = excess_for_zoom((1000, 1000), (1000, 1000), zoom=1.0)
+        self.assertEqual((excess_x, excess_y), (0, 0))
+
+    def test_excess_grows_with_zoom(self):
+        from dcpub.render import excess_for_zoom
+        excess_1 = excess_for_zoom((1000, 1000), (1000, 1000), zoom=1.0)
+        excess_2 = excess_for_zoom((1000, 1000), (1000, 1000), zoom=2.0)
+        self.assertGreater(excess_2[0], excess_1[0])
+        self.assertGreater(excess_2[1], excess_1[1])
+
+    def test_wide_photo_on_taller_canvas_has_horizontal_excess(self):
+        from dcpub.render import excess_for_zoom
+        excess_x, excess_y = excess_for_zoom((2000, 1000), (1000, 1500), zoom=1.0)
+        self.assertGreater(excess_x, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
