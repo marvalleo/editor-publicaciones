@@ -233,7 +233,7 @@ class App(tk.Tk):
                                  font=("Segoe UI", 10), relief="flat", bd=4, wrap="word")
         self.txt_title.insert("1.0", self.v_title.get())
         self.txt_title.pack(fill=tk.X, pady=(0, 8), **pad)
-        self.txt_title.bind("<KeyRelease>", lambda e: self._schedule_render())
+        self.txt_title.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Subtítulo
         tk.Label(left, text="✨  Subtítulo (cursiva verde)", bg=PANEL, fg=TEXT,
@@ -241,7 +241,7 @@ class App(tk.Tk):
         e_sub = tk.Entry(left, textvariable=self.v_sub, bg=FIELD, fg=TEXT,
                          insertbackground="white", relief="flat", bd=4, font=("Segoe UI", 10))
         e_sub.pack(fill=tk.X, pady=(0, 8), **pad)
-        e_sub.bind("<KeyRelease>", lambda e: self._schedule_render())
+        e_sub.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Descripción
         tk.Label(left, text="📝  Descripción (recuadro inferior)", bg=PANEL, fg=TEXT,
@@ -249,7 +249,7 @@ class App(tk.Tk):
         self.txt_desc = tk.Text(left, height=4, bg=FIELD, fg=TEXT, insertbackground=TEXT,
                                 font=("Segoe UI", 10), relief="flat", bd=4, wrap="word")
         self.txt_desc.pack(fill=tk.X, pady=(0, 8), **pad)
-        self.txt_desc.bind("<KeyRelease>", lambda e: self._schedule_render())
+        self.txt_desc.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Ícono
         tk.Label(left, text="🔖  Ícono del recuadro", bg=PANEL, fg=TEXT,
@@ -257,7 +257,7 @@ class App(tk.Tk):
         cb = ttk.Combobox(left, textvariable=self.v_icon, values=ICONS,
                           state="readonly", font=("Segoe UI", 10))
         cb.pack(fill=tk.X, pady=(0, 10), **pad)
-        cb.bind("<<ComboboxSelected>>", lambda e: self._schedule_render())
+        cb.bind("<<ComboboxSelected>>", lambda e: self._on_direct_edit())
 
         # Proyecto
         proj_row = tk.Frame(left, bg=PANEL)
@@ -605,6 +605,7 @@ class App(tk.Tk):
         old_value = layer.visible
         self.commands.push(PropertyChangeCommand(layer, "visible", old_value, not old_value))
         self._build_property_panel()
+        self._refresh_layers_list()
         self._schedule_render()
 
     def _toggle_locked(self):
@@ -615,6 +616,7 @@ class App(tk.Tk):
         old_value = layer.locked
         self.commands.push(PropertyChangeCommand(layer, "locked", old_value, not old_value))
         self._build_property_panel()
+        self._refresh_layers_list()
         self._schedule_render()
 
     def _center_selected(self, axis):
@@ -747,11 +749,17 @@ class App(tk.Tk):
         self.slide = self.project.slides[0]
         self._selected = None
         self._build_property_panel()
+        self._set_dirty(True)
         self._schedule_render()
 
     def _on_commands_changed(self):
         """Callback del CommandStack: se ejecuta en cada push/undo/redo."""
         self._set_dirty(True)
+
+    def _on_direct_edit(self):
+        """Marca cambios hechos desde widgets que no pasan por comandos."""
+        self._set_dirty(True)
+        self._schedule_render()
 
     def _set_dirty(self, value):
         self._dirty = value
@@ -942,6 +950,7 @@ class App(tk.Tk):
         else:
             formato = next(f for f in FORMATOS if f["label"] == label)
             self.slide.format = {"name": formato["name"], "w": formato["w"], "h": formato["h"]}
+        self._set_dirty(True)
         self._schedule_render()
 
     def _sync_format_label(self):
@@ -969,6 +978,7 @@ class App(tk.Tk):
         if path:
             self.v_photo.set(path)
             self._layer_by_kind("photo").src = path
+            self._set_dirty(True)
             self._schedule_render()
 
     # ── Capas actuales: adapta el modelo al dict plano que espera render.py ──
@@ -1139,26 +1149,27 @@ class App(tk.Tk):
     # ── Guardar / abrir proyecto ────────────────────────────────
     def _save_project(self):
         if self._project_path is None:
-            self._save_project_as()
-            return
+            return self._save_project_as()
         self._sync_text_to_layers()
         from .project_io import save_project
         save_project(self.project, self._project_path)
         self._set_dirty(False)
         self.v_status.set(f"✅ Proyecto guardado: {self._project_path.name}")
+        return True
 
     def _save_project_as(self):
         path_str = filedialog.asksaveasfilename(
             title="Guardar proyecto", defaultextension=".json",
             filetypes=[("Proyecto", "*.json")], initialdir=str(SCRIPT_DIR))
         if not path_str:
-            return
+            return False
         self._project_path = Path(path_str)
         self._sync_text_to_layers()
         from .project_io import save_project
         save_project(self.project, self._project_path)
         self._set_dirty(False)
         self.v_status.set(f"✅ Proyecto guardado: {self._project_path.name}")
+        return True
 
     def _confirm_discard_changes(self):
         """Si hay cambios sin guardar, pregunta qué hacer. Devuelve True si se
@@ -1170,7 +1181,7 @@ class App(tk.Tk):
         if answer is None:
             return False
         if answer:
-            self._save_project()
+            return bool(self._save_project())
         return True
 
     def _open_project(self):
