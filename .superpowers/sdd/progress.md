@@ -122,3 +122,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
 - Tarea 2 (render desc configurable con fallback legado): complete (commit 4f26074..2508b15, review clean, 223 tests)
 - Tarea 3 (render rama cta nueva): complete (commit 0a4fd80..cc38b76, review clean, 227 tests)
 - Tarea 4 (adaptadores _build_layers_for / Exporter): complete (commit 478b1c7..2892922, review clean, 231 tests)
+- Tarea 5 (migracion automatica de proyectos legado): complete (commit 5c26638..ca9841f, review clean, 235 tests)
