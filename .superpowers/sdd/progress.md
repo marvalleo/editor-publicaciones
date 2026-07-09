@@ -126,3 +126,8 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
 - Tarea 6 (batch_import crea CTALayer real): complete (commit 828d331..3789b43, review clean, 236 tests)
 - Tarea 7 (panel de propiedades reconoce cta + sliders w/h): complete (commit b5500ef..da1a014, review clean, 239 tests)
 - Tarea 8 (selector de color fill/text_color): complete (commit fb412e0..ac7d8ef, review clean, 243 tests)
+- Tarea 9 (boton Agregar CTA + campo de texto propio): complete (commit 5aba54b..c72ecb9, review clean,
+  247 tests). Desviacion documentada y confirmada segura: _add_cta_layer no usa _set_selected (el brief
+  original rompia el fixture headless al disparar _render_now via v_photo inexistente); se uso
+  self._selected + _build_property_panel directo, con el mismo _refresh_layers_list/_schedule_render
+  que ya traia el brief. Sin regresion de comportamiento en la app real.
