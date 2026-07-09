@@ -15,3 +15,6 @@ Plan: docs/superpowers/plans/2026-07-08-fase1-tareas-1.6-1.9.md
 - Tarea 3 (guardar/abrir proyecto): complete (commits 31f6ddc..58ab31a, review clean)
   - Nota (Minor, no bloqueante): la ruta del logo nunca se sincroniza con la UI
     (no hay widget v_logo) — gap preexistente del brief, no del implementador.
+- Tarea 4 (exportar): complete (commits 103a784..a6f1bda, review clean)
+
+Pendiente: revision final de toda la rama antes de mergear.
