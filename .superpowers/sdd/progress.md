@@ -93,3 +93,4 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
   - Nota (Minor, no bloqueante): tests de TestExcessForZoom/TestOffsetDeltaForDrag usan
     asserts direccionales (>0/<0) en vez de valores exactos calculables a mano, tal como
     los especifica el plan verbatim. No es negligencia del implementador.
+- Tarea 7 (drag para panear en canvas): complete (commit 55889c5..45d4acc, review clean, 211 tests)
