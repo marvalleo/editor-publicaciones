@@ -1,5 +1,6 @@
 """Modelo de datos: Project, Slide, Layer y subclases, con (de)serialización a dict."""
 
+import copy
 from dataclasses import dataclass, field, asdict
 import uuid
 
@@ -195,3 +196,54 @@ def crear_proyecto_por_defecto(photo_path: str = "") -> Project:
     project = Project()
     project.slides = [crear_slide_por_defecto(photo_path)]
     return project
+
+
+def duplicar_slide(slide: Slide) -> Slide:
+    """Copia profunda de una lámina (formato y capas incluidos), con ids de
+    capa nuevos e independientes del original."""
+    copia = copy.deepcopy(slide)
+    for layer in copia.layers:
+        layer.id = _short_id()
+    return copia
+
+
+LAYER_STYLE_FIELDS = {
+    ("photo", None): ("x", "y", "w", "h", "rotation", "opacity",
+                       "fit", "zoom", "offset_x", "offset_y", "adjust", "overlay"),
+    ("logo", None): ("x", "y", "w", "h", "rotation", "opacity", "keep_ratio"),
+    ("text", "title"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
+    ("text", "subtitle"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
+    ("box", None): ("x", "y", "w", "h", "rotation", "opacity", "size", "icon"),
+}
+
+
+def _estilo_key(layer: Layer):
+    role = getattr(layer, "role", None) if layer.type == "text" else None
+    return (layer.type, role)
+
+
+def plan_copia_estilo(origen: Slide, destino: Slide) -> list:
+    """Compara las capas de `origen` y `destino` por tipo/rol y devuelve la
+    lista de cambios de estilo a aplicar en `destino`: tuplas
+    (capa_destino, atributo, valor_nuevo). Preserva el contenido (texto/src)
+    de `destino` — solo se incluyen los campos listados en
+    LAYER_STYLE_FIELDS. Capas de `destino` sin equivalente por tipo/rol en
+    `origen` no generan cambios."""
+    origen_por_clave = {_estilo_key(layer): layer for layer in origen.layers}
+
+    cambios = []
+    for layer_destino in destino.layers:
+        clave = _estilo_key(layer_destino)
+        layer_origen = origen_por_clave.get(clave)
+        if layer_origen is None:
+            continue
+        campos = LAYER_STYLE_FIELDS.get(clave)
+        if campos is None:
+            continue
+        for campo in campos:
+            valor_nuevo = getattr(layer_origen, campo)
+            if isinstance(valor_nuevo, dict):
+                valor_nuevo = dict(valor_nuevo)
+            if getattr(layer_destino, campo) != valor_nuevo:
+                cambios.append((layer_destino, campo, valor_nuevo))
+    return cambios
