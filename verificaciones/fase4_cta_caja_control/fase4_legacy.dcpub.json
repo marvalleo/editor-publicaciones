@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "name": "Proyecto sin título",
+  "default_format": {
+    "name": "feed_4x5",
+    "w": 1080,
+    "h": 1350
+  },
+  "palette": {
+    "verde": [
+      141,
+      194,
+      111
+    ],
+    "blanco": [
+      255,
+      255,
+      255
+    ],
+    "box": [
+      40,
+      25,
+      15,
+      215
+    ]
+  },
+  "shared": {},
+  "slides": [
+    {
+      "format": {
+        "name": "feed_4x5",
+        "w": 1080,
+        "h": 1350
+      },
+      "layout_tag": null,
+      "layers": [
+        {
+          "id": "8897e4ae",
+          "name": "Foto",
+          "type": "photo",
+          "visible": true,
+          "locked": false,
+          "z": 0,
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "h": 1.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "src": "foto_base.png",
+          "fit": "cover",
+          "zoom": 1.0,
+          "offset_x": 0.5,
+          "offset_y": 0.5,
+          "adjust": {
+            "brightness": 1.0,
+            "contrast": 1.0,
+            "saturation": 1.0,
+            "warmth": 0.0,
+            "sharpness": 1.0,
+            "shadows": 0.0,
+            "vignette": 0.0
+          },
+          "overlay": {
+            "bottom_grad": false,
+            "top_grad": false,
+            "strength": 0.0
+          }
+        },
+        {
+          "id": "a6454eb0",
+          "name": "Logo",
+          "type": "logo",
+          "visible": true,
+          "locked": false,
+          "z": 1,
+          "x": 0.4,
+          "y": 0.022,
+          "w": 0.2,
+          "h": 0.2,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "src": "C:\\Users\\MIPC\\Desktop\\Proyectos Corex\\editor-publicaciones\\.claude\\worktrees\\fase4-cta-caja\\logo-sin-fondo.png",
+          "keep_ratio": true
+        },
+        {
+          "id": "4a2e95c8",
+          "name": "Título",
+          "type": "text",
+          "visible": true,
+          "locked": false,
+          "z": 2,
+          "x": 0.055,
+          "y": 0.42,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "Tu título aquí",
+          "role": "title",
+          "size": 0.087
+        },
+        {
+          "id": "05ee225f",
+          "name": "Subtítulo",
+          "type": "text",
+          "visible": true,
+          "locked": false,
+          "z": 3,
+          "x": 0.5,
+          "y": 0.55,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "frase secundaria",
+          "role": "subtitle",
+          "size": 0.05
+        },
+        {
+          "id": "4e900cf6",
+          "name": "Descripción",
+          "type": "box",
+          "visible": true,
+          "locked": false,
+          "z": 4,
+          "x": 0.05,
+          "y": 0.808,
+          "w": 0.0,
+          "h": 0.0,
+          "rotation": 0.0,
+          "opacity": 1.0,
+          "text": "",
+          "icon": "planta",
+          "size": 0.033,
+          "fill": [
+            40,
+            25,
+            15,
+            215
+          ],
+          "text_color": [
+            255,
+            255,
+            255,
+            255
+          ]
+        }
+      ],
+      "extra": {}
+    }
+  ]
+}
