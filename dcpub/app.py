@@ -151,6 +151,7 @@ class App(tk.Tk):
         self._handles = {}           # {nombre_handle: (x,y) en px de pantalla}
         self._resize = None          # estado del arrastre de resize en curso, o None
         self._guides = []            # líneas guía activas durante un arrastre, [(tipo,pos_px), ...]
+        self._adjust_expanded = False  # colapsado por defecto
 
         from .commands import CommandStack
         self.commands = CommandStack(on_change=self._on_commands_changed)
@@ -565,6 +566,7 @@ class App(tk.Tk):
                          disabled=disabled)
             self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                          disabled=disabled, as_percent=True)
+            self._build_photo_adjust_section(card, layer, token, disabled)
             return
 
         smin, smax = SIZE_RANGE[kind]
@@ -590,6 +592,44 @@ class App(tk.Tk):
                   font=("Segoe UI", 8), state=btn_state,
                   command=lambda: self._center_selected("both")).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+
+    def _build_photo_adjust_section(self, card, layer, token, disabled):
+        toggle_row = tk.Frame(card, bg=PANEL)
+        toggle_row.pack(fill=tk.X, pady=(10, 0))
+        arrow = "▼" if self._adjust_expanded else "▶"
+        tk.Button(toggle_row, text=f"{arrow} Ajustes", bg=PANEL, fg=ACCENT, relief="flat",
+                  font=("Segoe UI", 9, "bold"), anchor="w",
+                  command=self._toggle_adjust_section).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        if not disabled:
+            tk.Button(toggle_row, text="Restablecer", bg="#3d3d3d", fg=TEXT, relief="flat",
+                      font=("Segoe UI", 8),
+                      command=lambda l=layer: self._reset_photo_adjust(l)).pack(side=tk.RIGHT)
+
+        if not self._adjust_expanded:
+            return
+
+        for key, label in ADJUST_LABELS.items():
+            lo, hi = ADJUST_RANGE[key]
+            self._slider(card, token, f"adjust.{key}", label, lo, hi, disabled=disabled)
+
+        tk.Frame(card, bg="#3d3d3d", height=1).pack(fill=tk.X, pady=(8, 6))
+
+        state = tk.DISABLED if disabled else tk.NORMAL
+        top_var = tk.BooleanVar(value=layer.overlay["top_grad"])
+        tk.Checkbutton(card, text="Degradado superior", variable=top_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_overlay_flag("top_grad")).pack(anchor="w")
+
+        bottom_var = tk.BooleanVar(value=layer.overlay["bottom_grad"])
+        tk.Checkbutton(card, text="Degradado inferior", variable=bottom_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_overlay_flag("bottom_grad")).pack(anchor="w")
+
+        lo, hi = OVERLAY_STRENGTH_RANGE
+        self._slider(card, token, "overlay.strength", "Intensidad del overlay", lo, hi,
+                     disabled=disabled)
 
     def _format_value(self, value, as_percent):
         if as_percent:
@@ -680,6 +720,32 @@ class App(tk.Tk):
         self.commands.push(PropertyChangeCommand(layer, "locked", old_value, not old_value))
         self._build_property_panel()
         self._refresh_layers_list()
+        self._schedule_render()
+
+    def _toggle_adjust_section(self):
+        self._adjust_expanded = not self._adjust_expanded
+        self._build_property_panel()
+
+    def _reset_photo_adjust(self, layer):
+        from .commands import DictItemChangeCommand, CompositeCommand
+        from .models import DEFAULT_PHOTO_ADJUST
+        cmds = [
+            DictItemChangeCommand(layer.adjust, key, layer.adjust[key], default)
+            for key, default in DEFAULT_PHOTO_ADJUST.items()
+            if layer.adjust[key] != default
+        ]
+        if cmds:
+            self.commands.push(CompositeCommand(cmds))
+        self._build_property_panel()
+        self._schedule_render()
+
+    def _toggle_overlay_flag(self, key):
+        layer = self._selected
+        if layer is None or self._kind_of(layer) != "photo" or layer.locked:
+            return
+        from .commands import DictItemChangeCommand
+        old_value = layer.overlay[key]
+        self.commands.push(DictItemChangeCommand(layer.overlay, key, old_value, not old_value))
         self._schedule_render()
 
     def _center_selected(self, axis):

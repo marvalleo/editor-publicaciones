@@ -70,5 +70,53 @@ class TestNestedAdjustParams(unittest.TestCase):
         self.assertEqual(self.foto.adjust["brightness"], 1.0)
 
 
+class TestPhotoAdjustSection(unittest.TestCase):
+    def setUp(self):
+        self.app = App.__new__(App)
+        self.app.project = crear_proyecto_por_defecto("foto.jpg")
+        self.app.slide = self.app.project.slides[0]
+        self.foto = App._layer_by_kind(self.app, "photo", self.app.slide)
+        self.app._selected = self.foto
+        self.app._adjust_expanded = False
+        self.app.ctrl = {}
+
+    def test_reset_photo_adjust_restores_defaults_and_pushes_one_command(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import DEFAULT_PHOTO_ADJUST
+        self.app.commands = CommandStack()
+        self.foto.adjust["brightness"] = 1.5
+        self.foto.adjust["vignette"] = 0.8
+        self.app._build_property_panel = lambda: None
+        self.app._schedule_render = lambda: None
+
+        App._reset_photo_adjust(self.app, self.foto)
+
+        self.assertEqual(self.foto.adjust, DEFAULT_PHOTO_ADJUST)
+
+    def test_reset_photo_adjust_is_undoable_as_one_step(self):
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.foto.adjust["brightness"] = 1.5
+        self.foto.adjust["vignette"] = 0.8
+        self.app._build_property_panel = lambda: None
+        self.app._schedule_render = lambda: None
+
+        App._reset_photo_adjust(self.app, self.foto)
+        self.app.commands.undo()
+
+        self.assertEqual(self.foto.adjust["brightness"], 1.5)
+        self.assertEqual(self.foto.adjust["vignette"], 0.8)
+
+    def test_toggle_overlay_flag_flips_value(self):
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._schedule_render = lambda: None
+        old = self.foto.overlay["bottom_grad"]
+
+        App._toggle_overlay_flag(self.app, "bottom_grad")
+
+        self.assertEqual(self.foto.overlay["bottom_grad"], not old)
+
+
 if __name__ == "__main__":
     unittest.main()
