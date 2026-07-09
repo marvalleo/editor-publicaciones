@@ -32,5 +32,6 @@ Tambien se confirmo que:
 ## Estado final
 
 - Rama `worktree-fase1-tareas-1.6-1.9` mergeada a `main` por fast-forward.
-- `main` listo para push a `origin/main`.
-- Worktree temporal listo para eliminar tras el push final.
+- `main` pusheado a `origin/main`.
+- Worktree temporal desregistrado de Git y rama local `worktree-fase1-tareas-1.6-1.9` eliminada.
+- Quedo una carpeta fisica residual en `.claude/worktrees/fase1-tareas-1.6-1.9` que Windows no permitio borrar porque esta en uso por otro proceso. `git worktree list` ya no la registra como worktree activo.
