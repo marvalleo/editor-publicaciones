@@ -257,6 +257,16 @@ class App(tk.Tk):
         cb.pack(fill=tk.X, pady=(0, 10), **pad)
         cb.bind("<<ComboboxSelected>>", lambda e: self._schedule_render())
 
+        # Proyecto
+        proj_row = tk.Frame(left, bg=PANEL)
+        proj_row.pack(fill=tk.X, pady=(4, 4), **pad)
+        tk.Button(proj_row, text="📂 Abrir", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 9), command=self._open_project).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 3))
+        tk.Button(proj_row, text="💾 Guardar", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 9), command=self._save_project).pack(
+            side=tk.LEFT, fill=tk.X, expand=True, padx=(3, 0))
+
         # Botones
         tk.Button(left, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 10), pady=8, command=self._render_now).pack(
@@ -1110,6 +1120,82 @@ class App(tk.Tk):
         self._resize = None
         self._guides = []
         self._render_now()
+
+    # ── Guardar / abrir proyecto ────────────────────────────────
+    def _save_project(self):
+        if self._project_path is None:
+            self._save_project_as()
+            return
+        self._sync_text_to_layers()
+        from .project_io import save_project
+        save_project(self.project, self._project_path)
+        self._set_dirty(False)
+        self.v_status.set(f"✅ Proyecto guardado: {self._project_path.name}")
+
+    def _save_project_as(self):
+        path_str = filedialog.asksaveasfilename(
+            title="Guardar proyecto", defaultextension=".json",
+            filetypes=[("Proyecto", "*.json")], initialdir=str(SCRIPT_DIR))
+        if not path_str:
+            return
+        self._project_path = Path(path_str)
+        self._sync_text_to_layers()
+        from .project_io import save_project
+        save_project(self.project, self._project_path)
+        self._set_dirty(False)
+        self.v_status.set(f"✅ Proyecto guardado: {self._project_path.name}")
+
+    def _confirm_discard_changes(self):
+        """Si hay cambios sin guardar, pregunta qué hacer. Devuelve True si se
+        puede continuar con la acción (abrir/cerrar), False si se canceló."""
+        if not self._dirty:
+            return True
+        answer = messagebox.askyesnocancel(
+            "Cambios sin guardar", "¿Guardar los cambios antes de continuar?")
+        if answer is None:
+            return False
+        if answer:
+            self._save_project()
+        return True
+
+    def _open_project(self):
+        if not self._confirm_discard_changes():
+            return
+        path_str = filedialog.askopenfilename(
+            title="Abrir proyecto", filetypes=[("Proyecto", "*.json")],
+            initialdir=str(SCRIPT_DIR))
+        if not path_str:
+            return
+        from .project_io import load_project
+        loaded = load_project(Path(path_str))
+        self.project = loaded
+        self.slide = self.project.slides[0]
+        self._project_path = Path(path_str)
+        self.commands.clear()
+        self._selected = None
+
+        photo_layer = self._layer_by_kind("photo")
+        self.v_photo.set(photo_layer.src if photo_layer else "")
+        title_layer = self._layer_by_kind("title")
+        self.txt_title.delete("1.0", tk.END)
+        self.txt_title.insert("1.0", title_layer.text if title_layer else "")
+        sub_layer = self._layer_by_kind("sub")
+        self.v_sub.set(sub_layer.text if sub_layer else "")
+        desc_layer = self._layer_by_kind("desc")
+        self.txt_desc.delete("1.0", tk.END)
+        self.txt_desc.insert("1.0", desc_layer.text if desc_layer else "")
+        self.v_icon.set(desc_layer.icon if desc_layer else "planta")
+        self.v_format.set(self._format_label_for(self.slide.format))
+
+        self._set_dirty(False)
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+        self.v_status.set(f"✅ Proyecto abierto: {self._project_path.name}")
+
+    def _on_close(self):
+        if self._confirm_discard_changes():
+            self.destroy()
 
     # ── Generar en alta resolución ─────────────────────────────
     def _generate(self):
