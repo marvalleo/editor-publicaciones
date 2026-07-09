@@ -89,3 +89,7 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
 - Tarea 3 (DictItemChangeCommand): complete (commit 9cc639c..fe72361, review clean, 196 tests)
 - Tarea 4 (params anidados en sliders/undo): complete (commit cd060d0..602edf4, review clean, 200 tests)
 - Tarea 5 (seccion de UI Ajustes): complete (commit 243d6fc..8602f86, review clean, 203 tests)
+- Tarea 6 (excess_for_zoom / offset_delta_for_drag): complete (commit 87f6efc..092c08b, review clean, 209 tests)
+  - Nota (Minor, no bloqueante): tests de TestExcessForZoom/TestOffsetDeltaForDrag usan
+    asserts direccionales (>0/<0) en vez de valores exactos calculables a mano, tal como
+    los especifica el plan verbatim. No es negligencia del implementador.
