@@ -101,6 +101,16 @@ class TestCompose(unittest.TestCase):
         img_without, _ = compose(layers_without, (400, 500), self.font_manager)
         self.assertEqual(list(img_with.getdata()), list(img_without.getdata()))
 
+    def test_logo_uses_src_when_provided(self):
+        logo_path = Path(self._tmpdir.name) / "logo_rojo.png"
+        Image.new("RGBA", (40, 40), (255, 0, 0, 255)).save(logo_path)
+        layers = [
+            {"type": "logo", "src": str(logo_path), "x": 0.0, "y": 0.0, "size": 0.20},
+        ]
+        img, bboxes = compose(layers, (100, 100), self.font_manager)
+        self.assertEqual(bboxes["logo"], (0, 0, 20, 20))
+        self.assertEqual(img.getpixel((10, 10)), (255, 0, 0, 255))
+
     def test_title_opacity_reduces_text_alpha(self):
         opaque = [
             {"type": "photo", "src": str(self.photo_path)},

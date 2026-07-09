@@ -41,8 +41,10 @@ class TestLayerTokens(unittest.TestCase):
         logo = next(layer for layer in self.app.slide.layers if layer.type == "logo")
         copia = dataclasses.replace(logo)
         copia.id = "logo_copia"
+        copia.src = "logo-copia.png"
         self.app.slide.layers.append(copia)
         self.app.v_photo = _Var("")
+        self.app.v_logo = _Var("logo-canonico.png")
         self.app.txt_title = _Text("")
         self.app.v_sub = _Var("")
         self.app.txt_desc = _Text("")
@@ -52,6 +54,20 @@ class TestLayerTokens(unittest.TestCase):
         logo_layers = [layer for layer in render_layers if layer["type"] == "logo"]
 
         self.assertEqual([layer["key"] for layer in logo_layers], [logo.id, copia.id])
+        self.assertEqual([layer["src"] for layer in logo_layers], ["logo-canonico.png", "logo-copia.png"])
+
+    def test_sync_text_to_layers_updates_canonical_logo_src(self):
+        logo = next(layer for layer in self.app.slide.layers if layer.type == "logo")
+        self.app.v_photo = _Var("")
+        self.app.v_logo = _Var("nuevo-logo.png")
+        self.app.txt_title = _Text("")
+        self.app.v_sub = _Var("")
+        self.app.txt_desc = _Text("")
+        self.app.v_icon = _Var("planta")
+
+        App._sync_text_to_layers(self.app)
+
+        self.assertEqual(logo.src, "nuevo-logo.png")
 
     def test_build_layers_uses_duplicate_text_content(self):
         title = next(layer for layer in self.app.slide.layers
@@ -61,6 +77,7 @@ class TestLayerTokens(unittest.TestCase):
         copia.text = "Texto de la copia"
         self.app.slide.layers.append(copia)
         self.app.v_photo = _Var("")
+        self.app.v_logo = _Var("")
         self.app.txt_title = _Text("Texto canonico")
         self.app.v_sub = _Var("")
         self.app.txt_desc = _Text("")

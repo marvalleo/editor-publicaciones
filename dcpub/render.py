@@ -1,5 +1,7 @@
 """Motor de render: compone la publicación a partir de una lista de capas."""
 
+from pathlib import Path
+
 from PIL import Image, ImageDraw
 
 from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE
@@ -156,11 +158,12 @@ def compose(layers, canvas_size, font_manager):
             bboxes[bbox_key] = (0, 0, W, H)
 
         elif kind == "logo":
-            if not LOGO_FILE.exists():
+            logo_path = Path(layer.get("src") or LOGO_FILE)
+            if not logo_path.exists():
                 continue
             lsz = max(20, int(W * layer["size"]))
             try:
-                logo = Image.open(str(LOGO_FILE)).convert("RGBA").resize((lsz, lsz), Image.LANCZOS)
+                logo = Image.open(str(logo_path)).convert("RGBA").resize((lsz, lsz), Image.LANCZOS)
                 if opacity < 1.0:
                     r, g, b, a = logo.split()
                     a = a.point(lambda px, op=opacity: int(px * max(0.0, min(1.0, op))))

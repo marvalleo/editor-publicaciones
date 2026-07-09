@@ -8,7 +8,7 @@ from tkinter import ttk, filedialog, messagebox, simpledialog
 
 from PIL import Image, ImageTk
 
-from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS, FORMATOS
+from .constants import SCRIPT_DIR, OUTPUT_DIR, ICONS, ELEMENTS, FORMATOS, LOGO_FILE
 from .fonts import FontManager
 from .models import crear_proyecto_por_defecto, _short_id
 from .render import compose
@@ -99,6 +99,7 @@ class App(tk.Tk):
 
         # Variables de texto
         self.v_photo = tk.StringVar()
+        self.v_logo = tk.StringVar(value=self._default_logo_src())
         self.v_title = tk.StringVar(value="Tu título aquí")
         self.v_sub   = tk.StringVar(value="frase secundaria")
         self.v_desc  = tk.StringVar()
@@ -225,6 +226,19 @@ class App(tk.Tk):
                  font=("Segoe UI", 9)).pack(side=tk.LEFT, fill=tk.X, expand=True)
         tk.Button(row, text="…", bg="#3d3d3d", fg=TEXT, relief="flat", padx=8,
                   command=self._browse).pack(side=tk.LEFT, padx=(4, 0))
+
+        # Logo
+        tk.Label(left, text="Logo", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
+        row_logo = tk.Frame(left, bg=PANEL)
+        row_logo.pack(fill=tk.X, pady=(0, 8), **pad)
+        e_logo = tk.Entry(row_logo, textvariable=self.v_logo, bg=FIELD, fg=TEXT,
+                          insertbackground="white", relief="flat", bd=4,
+                          font=("Segoe UI", 9))
+        e_logo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        e_logo.bind("<KeyRelease>", lambda e: self._on_logo_direct_edit())
+        tk.Button(row_logo, text="…", bg="#3d3d3d", fg=TEXT, relief="flat", padx=8,
+                  command=self._browse_logo).pack(side=tk.LEFT, padx=(4, 0))
 
         # Título (multilínea)
         tk.Label(left, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
@@ -771,6 +785,7 @@ class App(tk.Tk):
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]
+        self.v_logo.set(self._default_logo_src())
         self._selected = None
         self._build_property_panel()
         self._set_dirty(True)
@@ -784,6 +799,18 @@ class App(tk.Tk):
         """Marca cambios hechos desde widgets que no pasan por comandos."""
         self._set_dirty(True)
         self._schedule_render()
+
+    def _on_logo_direct_edit(self):
+        logo_layer = self._layer_by_kind("logo")
+        if logo_layer is not None:
+            logo_layer.src = self.v_logo.get().strip()
+        self._on_direct_edit()
+
+    def _default_logo_src(self):
+        logo_layer = self._layer_by_kind("logo") if hasattr(self, "slide") else None
+        if logo_layer is not None and logo_layer.src:
+            return logo_layer.src
+        return str(LOGO_FILE)
 
     def _set_dirty(self, value):
         self._dirty = value
@@ -814,6 +841,9 @@ class App(tk.Tk):
         photo_layer = self._layer_by_kind("photo")
         if photo_layer is not None:
             photo_layer.src = self.v_photo.get().strip()
+        logo_layer = self._layer_by_kind("logo")
+        if logo_layer is not None:
+            logo_layer.src = self.v_logo.get().strip()
 
     def _undo(self):
         if self.commands.undo():
@@ -1008,6 +1038,19 @@ class App(tk.Tk):
             self._set_dirty(True)
             self._schedule_render()
 
+    def _browse_logo(self):
+        path = filedialog.askopenfilename(
+            title="Seleccionar logo",
+            initialdir=str(SCRIPT_DIR),
+            filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.webp"), ("Todos", "*.*")])
+        if path:
+            self.v_logo.set(path)
+            logo_layer = self._layer_by_kind("logo")
+            if logo_layer is not None:
+                logo_layer.src = path
+            self._set_dirty(True)
+            self._schedule_render()
+
     # ── Capas actuales: adapta el modelo al dict plano que espera render.py ──
     def _build_layers(self):
         layers = []
@@ -1020,7 +1063,9 @@ class App(tk.Tk):
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
                                 "offset_y": layer.offset_y, "opacity": layer.opacity})
             elif layer.type == "logo":
+                src = self.v_logo.get().strip() if layer is self._layer_by_kind("logo") else layer.src
                 layers.append({"type": "logo", "key": layer.id,
+                                "src": src,
                                 "x": layer.x, "y": layer.y, "size": layer.w,
                                 "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "title":
@@ -1240,6 +1285,8 @@ class App(tk.Tk):
 
         photo_layer = self._layer_by_kind("photo")
         self.v_photo.set(photo_layer.src if photo_layer else "")
+        logo_layer = self._layer_by_kind("logo")
+        self.v_logo.set(logo_layer.src if logo_layer and logo_layer.src else str(LOGO_FILE))
         title_layer = self._layer_by_kind("title")
         self.txt_title.delete("1.0", tk.END)
         self.txt_title.insert("1.0", title_layer.text if title_layer else "")
