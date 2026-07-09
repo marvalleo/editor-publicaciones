@@ -97,3 +97,5 @@ Plan: docs/superpowers/plans/2026-07-09-fase3-foto.md
 - Tarea 8 (zoom con rueda del mouse): complete (commit e9d8dba..60d20ea, fix aplicado y re-revisado,
   216 tests). Hallazgo Important corregido: faltaba test del colapso de undo en burst de rueda; se
   agrego test que llama _commit_wheel_zoom directo y verifica un solo PropertyChangeCommand.
+- Tarea 9 (verificacion headless de cierre): complete (commit 008a231..f4a67d8, review clean,
+  216 tests, HEADLESS_OK)
