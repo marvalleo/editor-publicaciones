@@ -198,8 +198,10 @@ class App(tk.Tk):
 
     def _build_left(self, left):
         pad = {"padx": 16}
-        tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
-                 font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(16, 10), **pad)
+
+        lbl_textos = tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
+                               font=("Segoe UI", 11, "bold"))
+        lbl_textos.pack(anchor="w", pady=(6, 10), **pad)
 
         # Formato
         tk.Label(left, text="🖼  Formato", bg=PANEL, fg=TEXT,
@@ -310,6 +312,15 @@ class App(tk.Tk):
         tk.Button(left, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
                   font=("Segoe UI", 11, "bold"), pady=9, command=self._export).pack(
             fill=tk.X, pady=(4, 6), **pad)
+
+        # Panel de miniaturas de láminas: se instancia al final (después de
+        # txt_title/txt_desc, de los que depende _build_layers_for para
+        # componer las miniaturas) pero se empaqueta antes que "TEXTOS" para
+        # que aparezca visualmente arriba de todo, como pide el diseño.
+        from .slides_panel import SlidesPanel
+        self.slides_panel = SlidesPanel(left, self, bg=PANEL, panel_bg=PANEL,
+                                         accent=ACCENT, text_color=TEXT, muted_color=MUTED)
+        self.slides_panel.pack(fill=tk.X, padx=16, pady=(16, 4), before=lbl_textos)
 
         tk.Label(left, textvariable=self.v_status, bg=PANEL, fg=MUTED,
                  font=("Segoe UI", 9), wraplength=250, justify="left").pack(
@@ -1275,6 +1286,7 @@ class App(tk.Tk):
             self._draw_selection_overlay()
             self._draw_guides()
             self._update_readout()
+            self.slides_panel.refresh()
             self.v_status.set("Vista previa lista.")
         except Exception as e:
             self.v_status.set(f"Error: {e}")
