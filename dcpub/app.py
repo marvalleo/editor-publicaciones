@@ -96,6 +96,7 @@ class App(tk.Tk):
         # Proyecto y lámina activos (modelo formal de dcpub.models)
         self.project = crear_proyecto_por_defecto()
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
 
         # Variables de texto
         self.v_photo = tk.StringVar()
@@ -197,8 +198,10 @@ class App(tk.Tk):
 
     def _build_left(self, left):
         pad = {"padx": 16}
-        tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
-                 font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(16, 10), **pad)
+
+        lbl_textos = tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
+                               font=("Segoe UI", 11, "bold"))
+        lbl_textos.pack(anchor="w", pady=(6, 10), **pad)
 
         # Formato
         tk.Label(left, text="🖼  Formato", bg=PANEL, fg=TEXT,
@@ -231,7 +234,7 @@ class App(tk.Tk):
         tk.Label(left, text="Logo", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         row_logo = tk.Frame(left, bg=PANEL)
-        row_logo.pack(fill=tk.X, pady=(0, 8), **pad)
+        row_logo.pack(fill=tk.X, pady=(0, 4), **pad)
         e_logo = tk.Entry(row_logo, textvariable=self.v_logo, bg=FIELD, fg=TEXT,
                           insertbackground="white", relief="flat", bd=4,
                           font=("Segoe UI", 9))
@@ -239,6 +242,12 @@ class App(tk.Tk):
         e_logo.bind("<KeyRelease>", lambda e: self._on_logo_direct_edit())
         tk.Button(row_logo, text="…", bg="#3d3d3d", fg=TEXT, relief="flat", padx=8,
                   command=self._browse_logo).pack(side=tk.LEFT, padx=(4, 0))
+
+        self.v_logo_shared = tk.BooleanVar(value="logo" in self.project.shared)
+        tk.Checkbutton(left, text="Usar en todo el carrusel", variable=self.v_logo_shared,
+                        bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                        activeforeground=TEXT, font=("Segoe UI", 8),
+                        command=self._toggle_shared_logo).pack(anchor="w", pady=(0, 8), **pad)
 
         # Título (multilínea)
         tk.Label(left, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
@@ -303,6 +312,15 @@ class App(tk.Tk):
         tk.Button(left, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
                   font=("Segoe UI", 11, "bold"), pady=9, command=self._export).pack(
             fill=tk.X, pady=(4, 6), **pad)
+
+        # Panel de miniaturas de láminas: se instancia al final (después de
+        # txt_title/txt_desc, de los que depende _build_layers_for para
+        # componer las miniaturas) pero se empaqueta antes que "TEXTOS" para
+        # que aparezca visualmente arriba de todo, como pide el diseño.
+        from .slides_panel import SlidesPanel
+        self.slides_panel = SlidesPanel(left, self, bg=PANEL, panel_bg=PANEL,
+                                         accent=ACCENT, text_color=TEXT, muted_color=MUTED)
+        self.slides_panel.pack(fill=tk.X, padx=16, pady=(16, 4), before=lbl_textos)
 
         tk.Label(left, textvariable=self.v_status, bg=PANEL, fg=MUTED,
                  font=("Segoe UI", 9), wraplength=250, justify="left").pack(
@@ -611,6 +629,8 @@ class App(tk.Tk):
                 ]))
             else:
                 self.commands.push(PropertyChangeCommand(layer, param, old_value, value))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
         self._schedule_render()
 
     def _toggle_visible(self):
@@ -666,15 +686,19 @@ class App(tk.Tk):
                 PropertyChangeCommand(layer, "x", old_x, final_x),
                 PropertyChangeCommand(layer, "y", old_y, final_y),
             ]))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
 
         self._sync_sliders()
         self._render_now()
 
     # ── Puente entre el vocabulario del render y el modelo ─────
-    def _layer_by_kind(self, kind):
+    def _layer_by_kind(self, kind, slide=None):
         """Traduce entre el vocabulario del render ("photo"/"logo"/"title"/"sub"/"desc")
-        y los tipos/roles reales de dcpub.models (Layer.type, TextLayer.role)."""
-        for layer in self.slide.layers:
+        y los tipos/roles reales de dcpub.models (Layer.type, TextLayer.role).
+        Busca en `slide` si se pasa, o en la lámina activa (self.slide) si no."""
+        target = slide if slide is not None else self.slide
+        for layer in target.layers:
             if kind == "photo" and layer.type == "photo":
                 return layer
             if kind == "logo" and layer.type == "logo":
@@ -758,11 +782,14 @@ class App(tk.Tk):
                     PropertyChangeCommand(layer, "w", old_value, new_w),
                     PropertyChangeCommand(layer, "h", old_value, new_h),
                 ]))
+            self._sync_shared_logo_if_active()
             return
         new_value = self._get_layer_value(elem, param)
         if old_value != new_value:
             from .commands import PropertyChangeCommand
             self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
 
     def _sync_sliders(self):
         """Refleja el estado actual en los controles del panel activo, sin disparar render."""
@@ -782,9 +809,103 @@ class App(tk.Tk):
                 entry_var.set(self._format_value(value, param == "opacity"))
         self._updating = False
 
+    def _sync_widgets_from_slide(self):
+        """Refleja el contenido de self.slide en los widgets de texto/foto/logo
+        del panel izquierdo. Mismo bloque que usaba _open_project, ahora
+        reutilizable también al cambiar de lámina activa."""
+        photo_layer = self._layer_by_kind("photo")
+        self.v_photo.set(photo_layer.src if photo_layer else "")
+        logo_layer = self._layer_by_kind("logo")
+        self.v_logo.set(logo_layer.src if logo_layer and logo_layer.src else str(LOGO_FILE))
+        title_layer = self._layer_by_kind("title")
+        self.txt_title.delete("1.0", tk.END)
+        self.txt_title.insert("1.0", title_layer.text if title_layer else "")
+        sub_layer = self._layer_by_kind("sub")
+        self.v_sub.set(sub_layer.text if sub_layer else "")
+        desc_layer = self._layer_by_kind("desc")
+        self.txt_desc.delete("1.0", tk.END)
+        self.txt_desc.insert("1.0", desc_layer.text if desc_layer else "")
+        self.v_icon.set(desc_layer.icon if desc_layer else "planta")
+        self.v_format.set(self._format_label_for(self.slide.format))
+
+    def switch_to_slide(self, index):
+        """Cambia la lámina activa a project.slides[index] y refresca toda la
+        UI dependiente (widgets de texto, panel de propiedades, panel de
+        capas, vista previa). No hace nada si el índice está fuera de rango."""
+        if index < 0 or index >= len(self.project.slides):
+            return
+        self.current_slide_index = index
+        self.slide = self.project.slides[index]
+        self._selected = None
+        self._sync_widgets_from_slide()
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _add_slide(self):
+        """Inserta una lámina en blanco (layout default) justo después de la
+        lámina activa, con el mismo formato que la lámina activa."""
+        from .models import crear_slide_por_defecto
+        from .commands import AddSlideCommand
+        nueva = crear_slide_por_defecto(formato=dict(self.slide.format))
+        index = self.current_slide_index + 1
+        self.commands.push(AddSlideCommand(self.project.slides, nueva, index))
+        self.switch_to_slide(index)
+
+    def _duplicate_slide(self):
+        """Inserta una copia completa (texto incluido) de la lámina activa
+        justo después de ella."""
+        from .models import duplicar_slide
+        from .commands import AddSlideCommand
+        copia = duplicar_slide(self.slide)
+        index = self.current_slide_index + 1
+        self.commands.push(AddSlideCommand(self.project.slides, copia, index))
+        self.switch_to_slide(index)
+
+    def _delete_slide(self):
+        """Elimina la lámina activa, salvo que sea la última del proyecto."""
+        if len(self.project.slides) <= 1:
+            self.v_status.set("No se puede eliminar la última lámina.")
+            return
+        from .commands import DeleteSlideCommand
+        slide_a_borrar = self.slide
+        nuevo_index = min(self.current_slide_index, len(self.project.slides) - 2)
+        self.commands.push(DeleteSlideCommand(self.project.slides, slide_a_borrar))
+        self.switch_to_slide(nuevo_index)
+
+    def _move_slide(self, direction):
+        """Intercambia la lámina activa con la adyacente (direction=-1 sube,
+        +1 baja). No hace nada si ya está en el extremo."""
+        idx = self.current_slide_index
+        otro = idx + direction
+        if otro < 0 or otro >= len(self.project.slides):
+            return
+        from .commands import ReorderSlideCommand
+        self.commands.push(ReorderSlideCommand(self.project.slides, idx, otro))
+        self.switch_to_slide(otro)
+
+    def _copy_style_to_slide(self, origen_slide, destino_index):
+        """Copia posición/tamaño/estilo de las capas de `origen_slide` hacia
+        la lámina en `destino_index`, preservando el texto/contenido que esa
+        lámina ya tenía."""
+        if destino_index < 0 or destino_index >= len(self.project.slides):
+            return
+        from .models import plan_copia_estilo
+        from .commands import PropertyChangeCommand, CompositeCommand
+        destino = self.project.slides[destino_index]
+        cambios = plan_copia_estilo(origen_slide, destino)
+        if not cambios:
+            return
+        comandos = [PropertyChangeCommand(layer, attr, getattr(layer, attr), nuevo)
+                    for layer, attr, nuevo in cambios]
+        self.commands.push(CompositeCommand(comandos))
+        if destino_index == self.current_slide_index:
+            self._render_now()
+
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
         self.v_logo.set(self._default_logo_src())
         self._selected = None
         self._build_property_panel()
@@ -804,6 +925,7 @@ class App(tk.Tk):
         logo_layer = self._layer_by_kind("logo")
         if logo_layer is not None:
             logo_layer.src = self.v_logo.get().strip()
+        self._sync_shared_logo_if_active()
         self._on_direct_edit()
 
     def _default_logo_src(self):
@@ -811,6 +933,32 @@ class App(tk.Tk):
         if logo_layer is not None and logo_layer.src:
             return logo_layer.src
         return str(LOGO_FILE)
+
+    def _toggle_shared_logo(self):
+        """Escribe o borra project.shared["logo"] según el estado del checkbox
+        "Usar en todo el carrusel". Al activar, toma como valor inicial el
+        logo de la lámina activa."""
+        if self.v_logo_shared.get():
+            logo_layer = self._layer_by_kind("logo")
+            self.project.shared["logo"] = {
+                "src": logo_layer.src, "x": logo_layer.x, "y": logo_layer.y,
+                "w": logo_layer.w, "h": logo_layer.h,
+            }
+        else:
+            self.project.shared.pop("logo", None)
+        self._set_dirty(True)
+        self._schedule_render()
+
+    def _sync_shared_logo_if_active(self):
+        """Si el logo compartido está activo, actualiza su valor con el logo
+        actual de la lámina activa (para que un cambio de archivo se
+        propague a todo el carrusel)."""
+        if "logo" in self.project.shared:
+            logo_layer = self._layer_by_kind("logo")
+            self.project.shared["logo"] = {
+                "src": logo_layer.src, "x": logo_layer.x, "y": logo_layer.y,
+                "w": logo_layer.w, "h": logo_layer.h,
+            }
 
     def _set_dirty(self, value):
         self._dirty = value
@@ -855,7 +1003,18 @@ class App(tk.Tk):
 
     def _after_history_change(self):
         """Refresca toda la UI después de un undo/redo, porque el modelo
-        cambió por fuera del flujo normal de edición."""
+        cambió por fuera del flujo normal de edición. Si self.slide ya no
+        está en project.slides (undo/redo de una operación de lámina la
+        agregó o quitó), reconcilia el puntero de lámina activa antes de
+        refrescar nada más."""
+        if self.slide in self.project.slides:
+            self.current_slide_index = self.project.slides.index(self.slide)
+        else:
+            self.current_slide_index = min(self.current_slide_index,
+                                            len(self.project.slides) - 1)
+            self.slide = self.project.slides[self.current_slide_index]
+            self._selected = None
+            self._sync_widgets_from_slide()
         self._sync_sliders()
         self._build_property_panel()
         self._refresh_layers_list()
@@ -977,6 +1136,8 @@ class App(tk.Tk):
                 PropertyChangeCommand(layer, "x", old_x, new_x),
                 PropertyChangeCommand(layer, "y", old_y, new_y),
             ]))
+            if kind == "logo":
+                self._sync_shared_logo_if_active()
         self._sync_sliders()
         self._render_now()
 
@@ -1014,10 +1175,12 @@ class App(tk.Tk):
         """Restaura el texto del combobox al formato activo (p.ej. si se cancela el diálogo)."""
         self.v_format.set(self._format_label_for(self.slide.format))
 
-    def _canvas_size_for(self, max_side):
-        """Calcula (ancho, alto) en px del lienzo para el formato actual, con el
-        lado mayor igual a max_side, manteniendo la proporción del formato."""
-        fw, fh = self.slide.format["w"], self.slide.format["h"]
+    def _canvas_size_for(self, max_side, fmt=None):
+        """Calcula (ancho, alto) en px del lienzo para `fmt` (o el formato de
+        la lámina activa si no se pasa), con el lado mayor igual a max_side,
+        manteniendo la proporción del formato."""
+        formato = fmt if fmt is not None else self.slide.format
+        fw, fh = formato["w"], formato["h"]
         if fh >= fw:
             h = max_side
             w = max(1, round(max_side * fw / fh))
@@ -1048,45 +1211,66 @@ class App(tk.Tk):
             logo_layer = self._layer_by_kind("logo")
             if logo_layer is not None:
                 logo_layer.src = path
+            self._sync_shared_logo_if_active()
             self._set_dirty(True)
             self._schedule_render()
 
     # ── Capas actuales: adapta el modelo al dict plano que espera render.py ──
-    def _build_layers(self):
+    def _build_layers_for(self, slide):
+        """Adapta las capas de `slide` al dict plano que espera render.compose().
+        Si `slide` es la lámina activa (self.slide), las capas de foto/logo/
+        título/subtítulo/descripción reflejan los widgets en pantalla en vez
+        del valor guardado en el modelo (para que la vista previa muestre lo
+        que se está tipeando antes de sincronizarlo con _sync_text_to_layers).
+        Si el proyecto tiene un logo compartido activo (project.shared["logo"]),
+        ese valor pisa el logo propio de la lámina, sea cual sea."""
+        es_activa = slide is self.slide
+        shared_logo = self.project.shared.get("logo")
         layers = []
-        for layer in self.slide.layers:
+        for layer in slide.layers:
             if not layer.visible:
                 continue
             if layer.type == "photo":
-                src = self.v_photo.get().strip() if layer is self._layer_by_kind("photo") else layer.src
+                src = (self.v_photo.get().strip()
+                       if es_activa and layer is self._layer_by_kind("photo", slide) else layer.src)
                 layers.append({"type": "photo", "key": layer.id, "src": src,
                                 "zoom": layer.zoom, "offset_x": layer.offset_x,
                                 "offset_y": layer.offset_y, "opacity": layer.opacity})
             elif layer.type == "logo":
-                src = self.v_logo.get().strip() if layer is self._layer_by_kind("logo") else layer.src
-                layers.append({"type": "logo", "key": layer.id,
-                                "src": src,
-                                "x": layer.x, "y": layer.y, "size": layer.w,
-                                "opacity": layer.opacity})
+                if shared_logo is not None:
+                    layers.append({"type": "logo", "key": layer.id,
+                                    "src": shared_logo["src"],
+                                    "x": shared_logo["x"], "y": shared_logo["y"],
+                                    "size": shared_logo["w"], "opacity": layer.opacity})
+                else:
+                    src = (self.v_logo.get().strip()
+                           if es_activa and layer is self._layer_by_kind("logo", slide) else layer.src)
+                    layers.append({"type": "logo", "key": layer.id, "src": src,
+                                    "x": layer.x, "y": layer.y, "size": layer.w,
+                                    "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "title":
                 text = (self.txt_title.get("1.0", "end-1c")
-                        if layer is self._layer_by_kind("title") else layer.text)
+                        if es_activa and layer is self._layer_by_kind("title", slide) else layer.text)
                 layers.append({"type": "title", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "text" and layer.role == "subtitle":
-                text = self.v_sub.get() if layer is self._layer_by_kind("sub") else layer.text
+                text = (self.v_sub.get()
+                        if es_activa and layer is self._layer_by_kind("sub", slide) else layer.text)
                 layers.append({"type": "sub", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
                                 "opacity": layer.opacity})
             elif layer.type == "box":
-                text = (self.txt_desc.get("1.0", "end-1c")
-                        if layer is self._layer_by_kind("desc") else layer.text)
-                icon = self.v_icon.get() if layer is self._layer_by_kind("desc") else layer.icon
+                es_desc_activa = es_activa and layer is self._layer_by_kind("desc", slide)
+                text = self.txt_desc.get("1.0", "end-1c") if es_desc_activa else layer.text
+                icon = self.v_icon.get() if es_desc_activa else layer.icon
                 layers.append({"type": "desc", "key": layer.id, "text": text,
                                 "icon": icon, "x": layer.x, "y": layer.y,
                                 "size": layer.size, "opacity": layer.opacity})
         return layers
+
+    def _build_layers(self):
+        return self._build_layers_for(self.slide)
 
     # ── Render con debounce ────────────────────────────────────
     def _schedule_render(self, delay=50):
@@ -1122,6 +1306,7 @@ class App(tk.Tk):
             self._draw_selection_overlay()
             self._draw_guides()
             self._update_readout()
+            self.slides_panel.refresh()
             self.v_status.set("Vista previa lista.")
         except Exception as e:
             self.v_status.set(f"Error: {e}")
@@ -1205,6 +1390,8 @@ class App(tk.Tk):
                     PropertyChangeCommand(layer, "x", old_x, layer.x),
                     PropertyChangeCommand(layer, "y", old_y, layer.y),
                 ]))
+                if self._kind_of(layer) == "logo":
+                    self._sync_shared_logo_if_active()
         if self._resize is not None and self._selected is not None:
             kind = self._resize["kind"]
             token = self._resize["token"]
@@ -1218,11 +1405,14 @@ class App(tk.Tk):
                         PropertyChangeCommand(layer, "w", old_value, new_w),
                         PropertyChangeCommand(layer, "h", old_value, new_h),
                     ]))
+                self._sync_shared_logo_if_active()
             else:
                 new_value = self._get_layer_value(token, "size")
                 if old_value != new_value:
                     from .commands import PropertyChangeCommand
                     self.commands.push(PropertyChangeCommand(layer, "size", old_value, new_value))
+                    if self._kind_of(layer) == "logo":
+                        self._sync_shared_logo_if_active()
         self._drag_elem = None
         self._drag_start_xy = None
         self._resize = None
@@ -1279,24 +1469,13 @@ class App(tk.Tk):
         loaded = load_project(Path(path_str))
         self.project = loaded
         self.slide = self.project.slides[0]
+        self.current_slide_index = 0
         self._project_path = Path(path_str)
         self.commands.clear()
         self._selected = None
 
-        photo_layer = self._layer_by_kind("photo")
-        self.v_photo.set(photo_layer.src if photo_layer else "")
-        logo_layer = self._layer_by_kind("logo")
-        self.v_logo.set(logo_layer.src if logo_layer and logo_layer.src else str(LOGO_FILE))
-        title_layer = self._layer_by_kind("title")
-        self.txt_title.delete("1.0", tk.END)
-        self.txt_title.insert("1.0", title_layer.text if title_layer else "")
-        sub_layer = self._layer_by_kind("sub")
-        self.v_sub.set(sub_layer.text if sub_layer else "")
-        desc_layer = self._layer_by_kind("desc")
-        self.txt_desc.delete("1.0", tk.END)
-        self.txt_desc.insert("1.0", desc_layer.text if desc_layer else "")
-        self.v_icon.set(desc_layer.icon if desc_layer else "planta")
-        self.v_format.set(self._format_label_for(self.slide.format))
+        self.v_logo_shared.set("logo" in self.project.shared)
+        self._sync_widgets_from_slide()
 
         self._set_dirty(False)
         self._build_property_panel()

@@ -73,6 +73,55 @@ class ReorderLayerCommand:
         self.layer_b.z = self.z_b_old
 
 
+class AddSlideCommand:
+    """Inserta `slide` en `slides_list` en la posición `index`."""
+
+    def __init__(self, slides_list, slide, index):
+        self.slides_list = slides_list
+        self.slide = slide
+        self.index = index
+
+    def execute(self):
+        self.slides_list.insert(self.index, self.slide)
+
+    def undo(self):
+        self.slides_list.remove(self.slide)
+
+
+class DeleteSlideCommand:
+    """Quita `slide` de `slides_list`, recordando su índice original para
+    poder reinsertarlo en el mismo lugar al deshacer."""
+
+    def __init__(self, slides_list, slide):
+        self.slides_list = slides_list
+        self.slide = slide
+        self.index = None
+
+    def execute(self):
+        self.index = self.slides_list.index(self.slide)
+        self.slides_list.remove(self.slide)
+
+    def undo(self):
+        self.slides_list.insert(self.index, self.slide)
+
+
+class ReorderSlideCommand:
+    """Intercambia la posición de dos láminas en `slides_list`. El intercambio
+    es su propia operación inversa, así que undo() reusa execute()."""
+
+    def __init__(self, slides_list, index_a, index_b):
+        self.slides_list = slides_list
+        self.index_a = index_a
+        self.index_b = index_b
+
+    def execute(self):
+        self.slides_list[self.index_a], self.slides_list[self.index_b] = (
+            self.slides_list[self.index_b], self.slides_list[self.index_a])
+
+    def undo(self):
+        self.execute()
+
+
 class CompositeCommand:
     """Agrupa varios comandos para que undo/redo los trate como una sola
     unidad (ej.: mover x e y de un drag diagonal es UN gesto del usuario)."""
