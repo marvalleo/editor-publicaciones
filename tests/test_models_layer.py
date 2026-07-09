@@ -3,7 +3,7 @@
 import unittest
 
 from dcpub.models import (
-    Layer, PhotoLayer, LogoLayer, TextLayer, BoxLayer, layer_from_dict,
+    Layer, PhotoLayer, LogoLayer, TextLayer, BoxLayer, CTALayer, layer_from_dict,
 )
 
 
@@ -49,6 +49,20 @@ class TestLayerSubclasses(unittest.TestCase):
         self.assertEqual(b.type, "box")
         self.assertEqual(b.icon, "planta")
 
+    def test_box_layer_fill_and_text_color_defaults(self):
+        from dcpub.constants import BOX_COLOR, BLANCO
+        b = BoxLayer()
+        self.assertEqual(b.fill, list(BOX_COLOR))
+        self.assertEqual(b.text_color, list(BLANCO) + [255])
+
+    def test_cta_layer_defaults(self):
+        from dcpub.constants import BOX_COLOR, BLANCO
+        c = CTALayer()
+        self.assertEqual(c.type, "cta")
+        self.assertEqual(c.text, "")
+        self.assertEqual(c.fill, list(BOX_COLOR))
+        self.assertEqual(c.text_color, list(BLANCO) + [255])
+
     def test_to_dict_includes_all_fields(self):
         t = TextLayer(text="Hola", role="title")
         d = t.to_dict()
@@ -86,7 +100,9 @@ class TestLayerFromDict(unittest.TestCase):
             PhotoLayer(src="a.jpg"),
             LogoLayer(src="logo.png"),
             TextLayer(text="T", role="subtitle"),
-            BoxLayer(text="D", icon="corazón"),
+            BoxLayer(text="D", icon="corazón", fill=[1, 2, 3, 100],
+                     text_color=[4, 5, 6, 200]),
+            CTALayer(text="Reservá ahora", fill=[9, 9, 9, 200]),
         ]
         for layer in layers:
             restored = layer_from_dict(layer.to_dict())

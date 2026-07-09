@@ -94,6 +94,17 @@ class BoxLayer(Layer):
     text: str = ""
     icon: str = "ninguno"
     size: float = 0.033
+    fill: list = field(default_factory=lambda: list(BOX_COLOR))
+    text_color: list = field(default_factory=lambda: list(BLANCO) + [255])
+
+
+@dataclass
+class CTALayer(Layer):
+    type: str = "cta"
+    text: str = ""
+    size: float = 0.033
+    fill: list = field(default_factory=lambda: list(BOX_COLOR))
+    text_color: list = field(default_factory=lambda: list(BLANCO) + [255])
 
 
 LAYER_CLASSES = {
@@ -101,6 +112,7 @@ LAYER_CLASSES = {
     "logo": LogoLayer,
     "text": TextLayer,
     "box": BoxLayer,
+    "cta": CTALayer,
 }
 
 
@@ -188,7 +200,7 @@ def crear_slide_por_defecto(
                   size=0.087, text=titulo),
         TextLayer(name="Subtítulo", z=3, x=0.50, y=0.55,
                   role="subtitle", size=0.050, text=subtitulo),
-        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808,
+        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808, w=0.90, h=0.12,
                  size=0.033, text=descripcion, icon="planta"),
     ]
     return slide
@@ -216,7 +228,10 @@ LAYER_STYLE_FIELDS = {
     ("logo", None): ("x", "y", "w", "h", "rotation", "opacity", "keep_ratio"),
     ("text", "title"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
     ("text", "subtitle"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
-    ("box", None): ("x", "y", "w", "h", "rotation", "opacity", "size", "icon"),
+    ("box", None): ("x", "y", "w", "h", "rotation", "opacity", "size", "icon",
+                     "fill", "text_color"),
+    ("cta", None): ("x", "y", "w", "h", "rotation", "opacity", "size",
+                     "fill", "text_color"),
 }
 
 
