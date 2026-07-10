@@ -303,3 +303,53 @@ control de alineacion (fuera de alcance de esta sub-fase).
 Suite final: 325 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de Fase 4 del roadmap.
+
+# Fase 5 - Layouts A-E aplicables
+
+- Tarea 1 (datos de los 5 layouts, dcpub/presets/layouts.py): complete (commit debe64f,
+  review clean, 337 tests). Copia verbatim del brief, sin desviaciones.
+- Tarea 2 (plan_aplicar_layout en models.py, funcion pura): complete (commit 85fdf01,
+  review clean, 343 tests). Hallazgo Minor no bloqueante del revisor: a diferencia de
+  plan_copia_estilo, no hay guard "skip si el valor no cambio" -> siempre emite tupla de
+  cambio para cada campo del layout, incluso si la capa ya tiene ese valor. No es desvio
+  del brief (el brief pide exactamente ese codigo). Posible impacto en Tarea 3: si cada
+  cambio se empuja como PropertyChangeCommand individual, reaplicar el mismo layout (o
+  aplicar "A" a una lamina recien creada que ya tiene esos valores) generaria entradas de
+  undo sin efecto visible. A evaluar en la revision de Tarea 3.
+- Tarea 3 (App._apply_layout + botones A-E en panel izquierdo): complete (commits
+  49d9051..2729627, review clean tras fix, 349 tests). Hallazgo Minor del revisor:
+  import "LAYOUTS" sin uso en el bloque de botones (senalado tambien por el propio
+  implementador en su reporte) -> corregido directamente por el orquestador (fix mecanico
+  de una linea, sin ciclo completo de fix-subagent) en el commit 2729627.
+- Tarea 4 (verificacion headless de los 5 layouts): complete (commit 8c18195, review clean,
+  349 tests + HEADLESS_OK). 2 hallazgos Minor cosmeticos (dict "imagenes" sin lectura
+  posterior, doble iteracion de LAYOUTS en vez de recolectar bboxes en el primer loop) que
+  vienen del propio texto del plan, no del implementador -> no bloqueantes en un script de
+  verificacion manual, no ameritan ciclo de fix.
+
+# Revision final de rama completa (Layouts A-E, cierre Fase 5 sub-fase 1)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Coherencia
+preview<->export verificada end-to-end (_build_layers_for/app.py y _layers_from_slide/
+exporter.py leen x/y/w/h/size directo del modelo, mismos campos que tocan los layouts).
+plan_aplicar_layout confirmado puro en todos los casos (valores float, sin aliasing).
+Alcance respetado: solo lamina activa, foto de fondo nunca tocada (sin clave ("photo",
+None) en LAYOUTS), sin capas agregadas/quitadas. Dirty-flag correcto via CommandStack.
+
+1 hallazgo Minor nuevo (no detectado en las revisiones por-task porque ninguna tenia
+capa seleccionada al aplicar el layout): el panel de propiedades quedaba desactualizado
+tras aplicar un layout con una capa seleccionada (_render_now no reconstruye el panel).
+Corregido agregando self._build_property_panel() en App._apply_layout (commit siguiente
+a la revision final), mas el ajuste de setUp en TestApplyLayout para stubear ese metodo
+igual que las demas clases de test que ejercitan comandos con efectos de UI.
+
+3 hallazgos Minor ya conocidos de las revisiones por-task, reconfirmados como benignos:
+(1) plan_aplicar_layout sin guard "skip si no cambio" (a diferencia de plan_copia_estilo);
+(2) dict "imagenes" sin lectura + doble iteracion en el script de verificacion (cosmetico,
+script manual); (3) import sin uso en Tarea 3, ya corregido en la misma rama.
+
+Suite final: 349 tests OK.
+
+Veredicto: aprobada para merge a main. Con esto se cierra la primera sub-fase de Fase 5
+del roadmap (Layouts A-E). Quedan paleta de colores y libreria de copys como proximas
+sub-fases, con specs separadas.

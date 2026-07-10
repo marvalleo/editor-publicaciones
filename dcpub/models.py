@@ -296,3 +296,26 @@ def plan_copia_estilo(origen: Slide, destino: Slide) -> list:
             if getattr(layer_destino, campo) != valor_nuevo:
                 cambios.append((layer_destino, campo, valor_nuevo))
     return cambios
+
+
+def plan_aplicar_layout(slide: Slide, layout_id: str) -> list:
+    """Compara las capas de `slide` con los campos definidos en
+    LAYOUTS[layout_id] por tipo/rol y devuelve la lista de cambios a
+    aplicar: tuplas (capa, atributo, valor_nuevo). Preserva el contenido
+    de cada capa (texto/src) — solo cambia los campos listados en el
+    layout. Capas de `slide` sin equivalente por tipo/rol en el layout no
+    generan cambios. `layout_id` inexistente devuelve lista vacía."""
+    from .presets.layouts import LAYOUTS
+    layout = LAYOUTS.get(layout_id)
+    if layout is None:
+        return []
+
+    cambios = []
+    for layer in slide.layers:
+        clave = _estilo_key(layer)
+        campos = layout["campos"].get(clave)
+        if campos is None:
+            continue
+        for attr, valor in campos.items():
+            cambios.append((layer, attr, valor))
+    return cambios

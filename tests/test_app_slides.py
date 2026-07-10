@@ -594,6 +594,49 @@ class TestSyncSharedLogoOnNudgeAndCenter(unittest.TestCase):
         self.assertEqual(self.app.project.shared["logo"]["y"], logo_layer.y)
 
 
+class TestApplyLayout(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.app._render_now = lambda: None
+        self.app._build_property_panel = lambda: None
+
+    def test_repositions_title_of_active_slide(self):
+        App._apply_layout(self.app, "B")
+        titulo = self.app.slide.layers[2]
+        self.assertEqual((titulo.x, titulo.y, titulo.size), (0.12, 0.44, 0.080))
+
+    def test_does_not_touch_text_content(self):
+        App._apply_layout(self.app, "D")
+        titulo = self.app.slide.layers[2]
+        self.assertEqual(titulo.text, "Titulo lamina 1")
+
+    def test_sets_layout_tag_on_the_active_slide(self):
+        App._apply_layout(self.app, "E")
+        self.assertEqual(self.app.slide.layout_tag, "E")
+
+    def test_does_not_affect_other_slides(self):
+        App._apply_layout(self.app, "C")
+        otra = self.app.project.slides[1]
+        self.assertIsNone(otra.layout_tag)
+        self.assertEqual(otra.layers[2].x, 0.055)  # valor A por defecto sin tocar
+
+    def test_undo_reverts_the_layout(self):
+        titulo = self.app.slide.layers[2]
+        x_original = titulo.x
+        App._apply_layout(self.app, "B")
+        self.app.commands.undo()
+        self.assertEqual(titulo.x, x_original)
+
+    def test_unknown_layout_id_is_a_noop(self):
+        titulo = self.app.slide.layers[2]
+        x_original = titulo.x
+        App._apply_layout(self.app, "Z")
+        self.assertEqual(titulo.x, x_original)
+        self.assertIsNone(self.app.slide.layout_tag)
+
+
 if __name__ == "__main__":
     unittest.main()
 
