@@ -658,6 +658,7 @@ class TestBuildLayersForDotsLayer(unittest.TestCase):
         from dcpub.models import DotsLayer
         app = _make_app_with_two_slides()
         app.current_slide_index = 1
+        app.slide = app.project.slides[1]
         dots = DotsLayer(name="Puntos", z=10, x=0.5, y=0.9,
                          color=[1, 2, 3, 200], spacing=0.04,
                          opacity=0.7)
@@ -671,6 +672,23 @@ class TestBuildLayersForDotsLayer(unittest.TestCase):
         self.assertEqual(dots_dict["color"], [1, 2, 3, 200])
         self.assertEqual(dots_dict["spacing"], 0.04)
         self.assertEqual(dots_dict["opacity"], 0.7)
+
+    def test_build_layers_for_non_active_slide_uses_that_slides_own_index(self):
+        """Reproduce el bug de miniaturas: SlidesPanel llama
+        _build_layers_for(slide) para CADA lámina del panel, no solo la
+        activa. El punto activo debe reflejar la posición de esa lámina
+        dentro de project.slides, no self.current_slide_index (que sigue
+        apuntando a la lámina que el usuario tiene seleccionada)."""
+        from dcpub.models import DotsLayer
+        app = _make_app_with_two_slides()
+        app.current_slide_index = 0
+        segunda = app.project.slides[1]
+        segunda.layers.append(DotsLayer(name="Puntos", z=10))
+
+        layers = App._build_layers_for(app, segunda)
+
+        dots_dict = next(layer for layer in layers if layer["type"] == "dots")
+        self.assertEqual(dots_dict["active"], 1)
 
 
 class TestAddDotsLayer(unittest.TestCase):

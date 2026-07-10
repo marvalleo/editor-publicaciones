@@ -546,11 +546,18 @@ class TestDotsLayerRender(unittest.TestCase):
         img, bboxes = compose([self._layer()], (100, 100), self._font_manager())
 
         self.assertIn("puntos", bboxes)
+        # Los 3 centros (2 puntos base + 1 activo) deben estar pintados.
         self.assertEqual(img.getpixel((40, 50)), (0, 255, 0, 255))
         self.assertEqual(img.getpixel((50, 50)), (0, 255, 0, 255))
         self.assertEqual(img.getpixel((60, 50)), (0, 255, 0, 255))
-        self.assertEqual(img.getpixel((50, 44)), (0, 255, 0, 255))
-        self.assertEqual(img.getpixel((40, 44)), (0, 0, 0, 0))
+        # El punto activo (x=50) debe tener mayor radio vertical que uno
+        # base (x=40): se mide cuantos pixeles opacos hay en cada columna,
+        # sin asumir un radio fijo en pixeles.
+        opaque_active = sum(1 for y in range(30, 70) if img.getpixel((50, y))[3] > 0)
+        opaque_base = sum(1 for y in range(30, 70) if img.getpixel((40, y))[3] > 0)
+        self.assertGreater(opaque_active, opaque_base)
+        # Bien por fuera de cualquier circulo debe quedar transparente.
+        self.assertEqual(img.getpixel((40, 30)), (0, 0, 0, 0))
 
     def test_dots_opacity_zero_keeps_bbox_but_draws_no_pixels(self):
         from dcpub.render import compose
@@ -558,6 +565,28 @@ class TestDotsLayerRender(unittest.TestCase):
 
         self.assertIn("puntos", bboxes)
         self.assertIsNone(img.getbbox())
+
+    def test_dots_render_as_discrete_circles_at_realistic_canvas_width(self):
+        """A resolucion real (1080), los radios fijos en fraccion de W
+        superaban el rango completo del slider de spacing, fusionando los
+        puntos en una sola mancha. Los puntos deben verse como circulos
+        separados en el spacing por defecto (0.025)."""
+        from dcpub.render import compose
+        W = 1080
+        count = 5
+        img, bboxes = compose(
+            [self._layer(count=count, active=2, spacing=0.025)], (W, W), self._font_manager())
+        x0, y0, x1, y1 = bboxes["puntos"]
+        mid_y = (y0 + y1) // 2
+        opaque = [img.getpixel((x, mid_y))[3] > 0 for x in range(x0, x1)]
+        runs = 0
+        previous = False
+        for is_opaque in opaque:
+            if is_opaque and not previous:
+                runs += 1
+            previous = is_opaque
+        self.assertEqual(runs, count,
+                          "los puntos deben verse como circulos separados, no una mancha continua")
 
 
 class TestTrackedTextHelpers(unittest.TestCase):

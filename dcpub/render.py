@@ -680,8 +680,13 @@ def compose(layers, canvas_size, font_manager, palette=None):
             cx = int(layer.get("x", 0.5) * W)
             cy = int(layer.get("y", 0.5) * H)
             spacing_px = max(1, int(W * layer.get("spacing", 0.025)))
-            base_r = max(3, int(W * 0.035))
-            active_r = max(base_r + 2, int(W * 0.065))
+            # El radio de marca (fraccion de W) es el tamaño preferido, pero
+            # se recorta al spacing disponible para que los puntos nunca se
+            # superpongan entre si, sea cual sea el spacing elegido.
+            base_r = max(2, min(int(W * 0.035), int(spacing_px * 0.28)))
+            active_r = max(base_r + 1, min(int(W * 0.065), int(spacing_px * 0.45)))
+            if count > 1:
+                active_r = min(active_r, max(base_r + 1, spacing_px - base_r))
             total_w = spacing_px * (count - 1) + active_r * 2
             total_h = active_r * 2
             dots_layer = Image.new("RGBA", (total_w, total_h), (0, 0, 0, 0))

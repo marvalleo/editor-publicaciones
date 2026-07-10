@@ -1684,7 +1684,7 @@ class App(tk.Tk):
                 layers.append({"type": "dots", "key": layer.id,
                                 "x": layer.x, "y": layer.y,
                                 "count": len(self.project.slides),
-                                "active": self.current_slide_index,
+                                "active": self.project.slides.index(slide),
                                 "color": layer.color, "spacing": layer.spacing,
                                 "opacity": layer.opacity})
         return layers

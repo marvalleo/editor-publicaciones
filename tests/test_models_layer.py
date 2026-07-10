@@ -140,6 +140,8 @@ class TestLayerFromDict(unittest.TestCase):
             BoxLayer(text="D", icon="corazón", fill=[1, 2, 3, 100],
                      text_color=[4, 5, 6, 200]),
             CTALayer(text="Reservá ahora", fill=[9, 9, 9, 200]),
+            LineLayer(length=0.30, thickness=0.008, color=[7, 8, 9, 250], gap=0.05),
+            DotsLayer(color=[10, 11, 12, 240], spacing=0.04),
         ]
         for layer in layers:
             restored = layer_from_dict(layer.to_dict())
