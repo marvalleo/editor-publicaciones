@@ -263,3 +263,11 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
   palette.py vuelven a su estado exacto original (diff neto cero verificado), TextLayer.color
   queda en list(BLANCO)+[255] = [255,255,255,255], el blanco real que usa hoy el titulo. El crema
   de PALETA_PRINCIPAL es data de paleta para la futura Fase 5, todavia no esta cableada a compose().
+- Tarea 2 (render: rama free con pipeline unico): complete (commit 4d6ba25, review clean, 318 tests).
+  Desviacion justificada del implementador: el test de color del brief muestreaba el pixel exacto
+  del centro geometrico del bbox, que para el texto "Bloque de prueba" en Lato-Regular caia en un
+  hueco entre letras (transparente) por coincidencia de fuente/texto, no por un bug de render.
+  Corregido a buscar el primer pixel opaco de la fila (verificado por el revisor que sigue
+  distinguiendo color propio vs. color de marca correctamente). Nota Minor no bloqueante: el
+  comentario del test dice "mas cercano al centro" pero en realidad es "primero de izquierda a
+  derecha" — cosmetico, no afecta la cobertura.
