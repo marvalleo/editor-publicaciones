@@ -56,6 +56,10 @@ class TestLayerSubclasses(unittest.TestCase):
         self.assertFalse(t.stroke_on)
         self.assertEqual(t.stroke_width, 0.0)
 
+    def test_text_layer_free_block_has_configurable_color(self):
+        t = TextLayer(text="Hola", role="free")
+        self.assertEqual(t.color, [247, 241, 232, 255])
+
     def test_box_layer_defaults(self):
         b = BoxLayer(text="desc", icon="planta", size=0.03)
         self.assertEqual(b.type, "box")
@@ -137,6 +141,8 @@ class TestLayerFromDict(unittest.TestCase):
             TextLayer(text="T", role="subtitle", font_family="lato", bold=True,
                       italic=True, underline=True, line_spacing=1.4,
                       letter_spacing=0.05, stroke_on=True, stroke_width=0.02),
+            TextLayer(text="Bloque libre", role="free", color=[10, 20, 30, 200],
+                      font_family="dancing", rotation=5.0),
             BoxLayer(text="D", icon="corazón", fill=[1, 2, 3, 100],
                      text_color=[4, 5, 6, 200]),
             CTALayer(text="Reservá ahora", fill=[9, 9, 9, 200]),
