@@ -308,3 +308,11 @@ Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de
 
 - Tarea 1 (datos de los 5 layouts, dcpub/presets/layouts.py): complete (commit debe64f,
   review clean, 337 tests). Copia verbatim del brief, sin desviaciones.
+- Tarea 2 (plan_aplicar_layout en models.py, funcion pura): complete (commit 85fdf01,
+  review clean, 343 tests). Hallazgo Minor no bloqueante del revisor: a diferencia de
+  plan_copia_estilo, no hay guard "skip si el valor no cambio" -> siempre emite tupla de
+  cambio para cada campo del layout, incluso si la capa ya tiene ese valor. No es desvio
+  del brief (el brief pide exactamente ese codigo). Posible impacto en Tarea 3: si cada
+  cambio se empuja como PropertyChangeCommand individual, reaplicar el mismo layout (o
+  aplicar "A" a una lamina recien creada que ya tiene esos valores) generaria entradas de
+  undo sin efecto visible. A evaluar en la revision de Tarea 3.
