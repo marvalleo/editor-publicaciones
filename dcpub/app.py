@@ -259,6 +259,18 @@ class App(tk.Tk):
         cb_formato.pack(fill=tk.X, pady=(2, 10), **pad)
         cb_formato.bind("<<ComboboxSelected>>", lambda e: self._on_format_change())
 
+        # Layout
+        tk.Label(left, text="🧩  Layout", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
+        row_layout = tk.Frame(left, bg=PANEL)
+        row_layout.pack(fill=tk.X, pady=(2, 10), **pad)
+        from .presets.layouts import LAYOUTS
+        for layout_id in ("A", "B", "C", "D", "E"):
+            tk.Button(row_layout, text=layout_id, bg="#3d3d3d", fg=TEXT, relief="flat",
+                      font=("Segoe UI", 9, "bold"), width=3,
+                      command=lambda lid=layout_id: self._apply_layout(lid)).pack(
+                side=tk.LEFT, padx=(0, 4))
+
         # Capas
         tk.Label(left, text="📚  Capas", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
@@ -1305,6 +1317,22 @@ class App(tk.Tk):
         self.commands.push(CompositeCommand(comandos))
         if destino_index == self.current_slide_index:
             self._render_now()
+
+    def _apply_layout(self, layout_id):
+        """Reposiciona logo/título/subtítulo/caja de la lámina activa según
+        el layout elegido (A-E), preservando su contenido. No afecta otras
+        láminas ni la foto de fondo."""
+        from .models import plan_aplicar_layout
+        from .commands import PropertyChangeCommand, CompositeCommand
+        cambios = plan_aplicar_layout(self.slide, layout_id)
+        if not cambios:
+            return
+        comandos = [PropertyChangeCommand(layer, attr, getattr(layer, attr), nuevo)
+                    for layer, attr, nuevo in cambios]
+        comandos.append(PropertyChangeCommand(
+            self.slide, "layout_tag", self.slide.layout_tag, layout_id))
+        self.commands.push(CompositeCommand(comandos))
+        self._render_now()
 
     def _reset(self):
         self.project = crear_proyecto_por_defecto(self.v_photo.get().strip())
