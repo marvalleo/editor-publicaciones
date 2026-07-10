@@ -278,3 +278,6 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
   _build_text_style_section y _on_cta_text_commit sin duplicar): complete (commit 623e421,
   review clean, 325 tests). Nota Minor no bloqueante: tk.Text sin wrap="word" (podria cortar
   palabras a la mitad en el editor), omision del propio brief, no del implementador.
+- Tarea 6 (verificacion headless de cierre): complete, HEADLESS_OK (325 tests)
+
+Veredicto: pendiente de revision final de rama completa.
