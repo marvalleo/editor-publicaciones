@@ -1,4 +1,4 @@
-"""Verificaci?n headless de Fase 4: l?neas decorativas + puntos de carrusel.
+"""Verificación headless de Fase 4: líneas decorativas + puntos de carrusel.
 No abre Tkinter."""
 
 import sys
@@ -38,7 +38,7 @@ def main():
     canvas_size = (slide.format["w"], slide.format["h"])
     font_manager = FontManager()
 
-    line = LineLayer(name="L?nea", z=10, x=0.50, y=0.66,
+    line = LineLayer(name="Línea", z=10, x=0.50, y=0.66,
                      length=0.35, thickness=0.006,
                      color=[255, 0, 0, 255], gap=0.08,
                      rotation=8.0)
@@ -53,12 +53,12 @@ def main():
 
     assert line.id in bboxes, "LineLayer debe producir bbox"
     assert dots.id in bboxes, "DotsLayer debe producir bbox"
-    assert render.getbbox() is not None, "el render debe tener p?xeles visibles"
+    assert render.getbbox() is not None, "el render debe tener píxeles visibles"
 
     neutral_layers = [layer for layer in layers if layer["type"] not in ("line", "dots")]
     neutral, _ = compose(neutral_layers, canvas_size, font_manager, palette=project.palette)
     diff = ImageChops.difference(neutral.convert("RGB"), render.convert("RGB"))
-    assert diff.getbbox() is not None, "l?neas/puntos deben cambiar el render"
+    assert diff.getbbox() is not None, "líneas/puntos deben cambiar el render"
 
     project_path = OUT_DIR / "fase4_lineas_puntos.dcpub.json"
     save_project(project, project_path)

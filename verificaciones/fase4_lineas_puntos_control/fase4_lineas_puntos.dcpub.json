@@ -80,7 +80,7 @@
           "h": 0.2,
           "rotation": 0.0,
           "opacity": 1.0,
-          "src": "C:\\Users\\MIPC\\.codex\\visualizations\\2026\\07\\10\\019f4bdf-42c6-7a93-97d1-920f70ad9c58\\editor-publicaciones-fase4-lineas-puntos\\logo-sin-fondo.png",
+          "src": "C:\\Users\\MIPC\\Desktop\\Proyectos Corex\\editor-publicaciones\\.claude\\worktrees\\fase4-lineas-puntos\\logo-sin-fondo.png",
           "keep_ratio": true
         },
         {
@@ -164,7 +164,7 @@
         },
         {
           "id": "s01_l06_line",
-          "name": "L?nea",
+          "name": "Línea",
           "type": "line",
           "visible": true,
           "locked": false,
@@ -263,7 +263,7 @@
           "h": 0.2,
           "rotation": 0.0,
           "opacity": 1.0,
-          "src": "C:\\Users\\MIPC\\.codex\\visualizations\\2026\\07\\10\\019f4bdf-42c6-7a93-97d1-920f70ad9c58\\editor-publicaciones-fase4-lineas-puntos\\logo-sin-fondo.png",
+          "src": "C:\\Users\\MIPC\\Desktop\\Proyectos Corex\\editor-publicaciones\\.claude\\worktrees\\fase4-lineas-puntos\\logo-sin-fondo.png",
           "keep_ratio": true
         },
         {

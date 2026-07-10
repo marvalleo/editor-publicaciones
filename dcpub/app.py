@@ -30,8 +30,8 @@ SIZE_RANGE = {
     "cta":   (0.015, 0.07),
 }
 
-LABELS = {"logo": "Logo", "title": "T?tulo", "sub": "Subt?tulo", "desc": "Descripci?n",
-          "cta": "CTA", "line": "L?nea", "dots": "Puntos"}
+LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción",
+          "cta": "CTA", "line": "Línea", "dots": "Puntos"}
 
 # Rangos de los ajustes fotográficos, alineados a los clamps de render.py
 ADJUST_RANGE = {
@@ -1404,18 +1404,18 @@ class App(tk.Tk):
             return
         if kind == "logo":
             tam = layer.w
-            size_label = "Tama?o"
+            size_label = "Tamaño"
         elif kind == "line":
             tam = layer.length
             size_label = "Largo"
         elif kind == "dots":
             tam = layer.spacing
-            size_label = "Separaci?n"
+            size_label = "Separación"
         else:
             tam = layer.size
-            size_label = "Tama?o"
+            size_label = "Tamaño"
         self.v_readout.set(
-            f"{LABELS[kind]} ? X: {layer.x:.3f}  Y: {layer.y:.3f}  {size_label}: {tam:.3f}")
+            f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  {size_label}: {tam:.3f}")
 
     def _draw_selection_overlay(self):
         self._handles = {}

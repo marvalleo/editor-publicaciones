@@ -711,7 +711,7 @@ class TestGeometricLayerPanelMetadata(unittest.TestCase):
     def test_line_and_dots_have_labels_but_no_size_range_requirement(self):
         from dcpub.app import LABELS, SIZE_RANGE
 
-        self.assertEqual(LABELS["line"], "L?nea")
+        self.assertEqual(LABELS["line"], "Línea")
         self.assertEqual(LABELS["dots"], "Puntos")
         self.assertNotIn("line", SIZE_RANGE)
         self.assertNotIn("dots", SIZE_RANGE)
@@ -779,4 +779,4 @@ class TestGeometricLayerReadout(unittest.TestCase):
 
         App._update_readout(app)
 
-        self.assertIn("Separaci?n: 0.040", app.v_readout.value)
+        self.assertIn("Separación: 0.040", app.v_readout.value)
