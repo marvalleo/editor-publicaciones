@@ -316,3 +316,8 @@ Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de
   cambio se empuja como PropertyChangeCommand individual, reaplicar el mismo layout (o
   aplicar "A" a una lamina recien creada que ya tiene esos valores) generaria entradas de
   undo sin efecto visible. A evaluar en la revision de Tarea 3.
+- Tarea 3 (App._apply_layout + botones A-E en panel izquierdo): complete (commits
+  49d9051..2729627, review clean tras fix, 349 tests). Hallazgo Minor del revisor:
+  import "LAYOUTS" sin uso en el bloque de botones (senalado tambien por el propio
+  implementador en su reporte) -> corregido directamente por el orquestador (fix mecanico
+  de una linea, sin ciclo completo de fix-subagent) en el commit 2729627.
