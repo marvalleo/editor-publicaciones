@@ -274,3 +274,7 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
 - Tarea 3 (adaptadores app.py/_build_layers_for + exporter.py/_layers_from_slide): complete
   (commit 11609bb, review clean, 320 tests)
 - Tarea 4 (boton "+ Agregar texto" + _add_text_layer): complete (commit b5667b2, review clean, 321 tests)
+- Tarea 5 (panel de propiedades: reconoce free, texto multilinea + color picker, reusa
+  _build_text_style_section y _on_cta_text_commit sin duplicar): complete (commit 623e421,
+  review clean, 325 tests). Nota Minor no bloqueante: tk.Text sin wrap="word" (podria cortar
+  palabras a la mitad en el editor), omision del propio brief, no del implementador.
