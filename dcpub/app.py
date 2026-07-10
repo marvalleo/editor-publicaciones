@@ -244,25 +244,54 @@ class App(tk.Tk):
         self.bind("<Control-Shift-Z>", lambda e: self._redo())
 
     def _build_left(self, left):
+        # Contenedor con scroll vertical: en pantallas chicas (notebooks) el
+        # panel completo no entra en la altura de la ventana (mismo patrón
+        # que _build_right para el panel de propiedades).
+        scroll_canvas = tk.Canvas(left, bg=PANEL, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left, orient="vertical", command=scroll_canvas.yview)
+        inner = tk.Frame(scroll_canvas, bg=PANEL)
+
+        inner_window = scroll_canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>",
+                   lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all")))
+        scroll_canvas.bind("<Configure>",
+                            lambda e: scroll_canvas.itemconfig(inner_window, width=e.width))
+        scroll_canvas.configure(yscrollcommand=scrollbar.set)
+
+        def _on_mousewheel(event):
+            scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def _bind_wheel(_e):
+            scroll_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_wheel(_e):
+            scroll_canvas.unbind_all("<MouseWheel>")
+
+        scroll_canvas.bind("<Enter>", _bind_wheel)
+        scroll_canvas.bind("<Leave>", _unbind_wheel)
+
+        scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         pad = {"padx": 16}
 
-        lbl_textos = tk.Label(left, text="TEXTOS", bg=PANEL, fg=ACCENT,
+        lbl_textos = tk.Label(inner, text="TEXTOS", bg=PANEL, fg=ACCENT,
                                font=("Segoe UI", 11, "bold"))
         lbl_textos.pack(anchor="w", pady=(6, 10), **pad)
 
         # Formato
-        tk.Label(left, text="🖼  Formato", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="🖼  Formato", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", **pad)
         self._formato_labels = [f["label"] for f in FORMATOS] + ["Personalizado…"]
-        cb_formato = ttk.Combobox(left, textvariable=self.v_format, values=self._formato_labels,
+        cb_formato = ttk.Combobox(inner, textvariable=self.v_format, values=self._formato_labels,
                                   state="readonly", font=("Segoe UI", 9))
         cb_formato.pack(fill=tk.X, pady=(2, 10), **pad)
         cb_formato.bind("<<ComboboxSelected>>", lambda e: self._on_format_change())
 
         # Layout
-        tk.Label(left, text="🧩  Layout", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="🧩  Layout", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        row_layout = tk.Frame(left, bg=PANEL)
+        row_layout = tk.Frame(inner, bg=PANEL)
         row_layout.pack(fill=tk.X, pady=(2, 10), **pad)
         for layout_id in ("A", "B", "C", "D", "E"):
             tk.Button(row_layout, text=layout_id, bg="#3d3d3d", fg=TEXT, relief="flat",
@@ -271,29 +300,29 @@ class App(tk.Tk):
                 side=tk.LEFT, padx=(0, 4))
 
         # Capas
-        tk.Label(left, text="📚  Capas", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="📚  Capas", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        self._layers_list_frame = tk.Frame(left, bg=PANEL)
+        self._layers_list_frame = tk.Frame(inner, bg=PANEL)
         self._layers_list_frame.pack(fill=tk.X, pady=(0, 10), **pad)
         self._refresh_layers_list()
 
-        tk.Button(left, text="+ Agregar CTA", bg="#3d3d3d", fg=TEXT, relief="flat",
+        tk.Button(inner, text="+ Agregar CTA", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_cta_layer).pack(
             fill=tk.X, pady=(0, 4), **pad)
-        tk.Button(left, text="+ Agregar línea", bg="#3d3d3d", fg=TEXT, relief="flat",
+        tk.Button(inner, text="+ Agregar línea", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_line_layer).pack(
             fill=tk.X, pady=(0, 4), **pad)
-        tk.Button(left, text="+ Agregar puntos", bg="#3d3d3d", fg=TEXT, relief="flat",
+        tk.Button(inner, text="+ Agregar puntos", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_dots_layer).pack(
             fill=tk.X, pady=(0, 4), **pad)
-        tk.Button(left, text="+ Agregar texto", bg="#3d3d3d", fg=TEXT, relief="flat",
+        tk.Button(inner, text="+ Agregar texto", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_text_layer).pack(
             fill=tk.X, pady=(0, 10), **pad)
 
         # Foto
-        tk.Label(left, text="📷  Foto", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="📷  Foto", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", **pad)
-        row = tk.Frame(left, bg=PANEL)
+        row = tk.Frame(inner, bg=PANEL)
         row.pack(fill=tk.X, pady=(2, 8), **pad)
         tk.Entry(row, textvariable=self.v_photo, bg=FIELD, fg=TEXT,
                  insertbackground="white", relief="flat", bd=4,
@@ -302,9 +331,9 @@ class App(tk.Tk):
                   command=self._browse).pack(side=tk.LEFT, padx=(4, 0))
 
         # Logo
-        tk.Label(left, text="Logo", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="Logo", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        row_logo = tk.Frame(left, bg=PANEL)
+        row_logo = tk.Frame(inner, bg=PANEL)
         row_logo.pack(fill=tk.X, pady=(0, 4), **pad)
         e_logo = tk.Entry(row_logo, textvariable=self.v_logo, bg=FIELD, fg=TEXT,
                           insertbackground="white", relief="flat", bd=4,
@@ -315,46 +344,46 @@ class App(tk.Tk):
                   command=self._browse_logo).pack(side=tk.LEFT, padx=(4, 0))
 
         self.v_logo_shared = tk.BooleanVar(value="logo" in self.project.shared)
-        tk.Checkbutton(left, text="Usar en todo el carrusel", variable=self.v_logo_shared,
+        tk.Checkbutton(inner, text="Usar en todo el carrusel", variable=self.v_logo_shared,
                         bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
                         activeforeground=TEXT, font=("Segoe UI", 8),
                         command=self._toggle_shared_logo).pack(anchor="w", pady=(0, 8), **pad)
 
         # Título (multilínea)
-        tk.Label(left, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="✏️  Título  (Enter = salto de línea)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        self.txt_title = tk.Text(left, height=3, bg=FIELD, fg=TEXT, insertbackground=TEXT,
+        self.txt_title = tk.Text(inner, height=3, bg=FIELD, fg=TEXT, insertbackground=TEXT,
                                  font=("Segoe UI", 10), relief="flat", bd=4, wrap="word")
         self.txt_title.insert("1.0", self.v_title.get())
         self.txt_title.pack(fill=tk.X, pady=(0, 8), **pad)
         self.txt_title.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Subtítulo
-        tk.Label(left, text="✨  Subtítulo (cursiva verde)", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="✨  Subtítulo (cursiva verde)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        e_sub = tk.Entry(left, textvariable=self.v_sub, bg=FIELD, fg=TEXT,
+        e_sub = tk.Entry(inner, textvariable=self.v_sub, bg=FIELD, fg=TEXT,
                          insertbackground="white", relief="flat", bd=4, font=("Segoe UI", 10))
         e_sub.pack(fill=tk.X, pady=(0, 8), **pad)
         e_sub.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Descripción
-        tk.Label(left, text="📝  Descripción (recuadro inferior)", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="📝  Descripción (recuadro inferior)", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        self.txt_desc = tk.Text(left, height=4, bg=FIELD, fg=TEXT, insertbackground=TEXT,
+        self.txt_desc = tk.Text(inner, height=4, bg=FIELD, fg=TEXT, insertbackground=TEXT,
                                 font=("Segoe UI", 10), relief="flat", bd=4, wrap="word")
         self.txt_desc.pack(fill=tk.X, pady=(0, 8), **pad)
         self.txt_desc.bind("<KeyRelease>", lambda e: self._on_direct_edit())
 
         # Ícono
-        tk.Label(left, text="🔖  Ícono del recuadro", bg=PANEL, fg=TEXT,
+        tk.Label(inner, text="🔖  Ícono del recuadro", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
-        cb = ttk.Combobox(left, textvariable=self.v_icon, values=ICONS,
+        cb = ttk.Combobox(inner, textvariable=self.v_icon, values=ICONS,
                           state="readonly", font=("Segoe UI", 10))
         cb.pack(fill=tk.X, pady=(0, 10), **pad)
         cb.bind("<<ComboboxSelected>>", lambda e: self._on_direct_edit())
 
         # Proyecto
-        proj_row = tk.Frame(left, bg=PANEL)
+        proj_row = tk.Frame(inner, bg=PANEL)
         proj_row.pack(fill=tk.X, pady=(4, 4), **pad)
         tk.Button(proj_row, text="📂 Abrir", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 9), command=self._open_project).pack(
@@ -363,16 +392,16 @@ class App(tk.Tk):
                   font=("Segoe UI", 9), command=self._save_project).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(3, 0))
 
-        tk.Button(left, text="🗂  Importar carrusel por lotes…", bg="#3d3d3d", fg=TEXT,
+        tk.Button(inner, text="🗂  Importar carrusel por lotes…", bg="#3d3d3d", fg=TEXT,
                   relief="flat", font=("Segoe UI", 9),
                   command=self._import_batch).pack(fill=tk.X, pady=(0, 6), **pad)
 
         # Botones
-        tk.Button(left, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
+        tk.Button(inner, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 10), pady=8, command=self._render_now).pack(
             fill=tk.X, pady=(6, 4), **pad)
 
-        export_row = tk.Frame(left, bg=PANEL)
+        export_row = tk.Frame(inner, bg=PANEL)
         export_row.pack(fill=tk.X, pady=(2, 2), **pad)
         tk.Label(export_row, text="Formato:", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 9)).pack(side=tk.LEFT)
@@ -384,10 +413,10 @@ class App(tk.Tk):
                   font=("Segoe UI", 8), command=self._choose_export_dir).pack(
             side=tk.RIGHT)
 
-        tk.Button(left, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
+        tk.Button(inner, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
                   font=("Segoe UI", 11, "bold"), pady=9, command=self._export).pack(
             fill=tk.X, pady=(4, 4), **pad)
-        tk.Button(left, text="📤  Exportar todas las láminas", bg="#3d3d3d", fg=TEXT,
+        tk.Button(inner, text="📤  Exportar todas las láminas", bg="#3d3d3d", fg=TEXT,
                   relief="flat", font=("Segoe UI", 9),
                   command=self._export_all).pack(fill=tk.X, pady=(0, 6), **pad)
 
@@ -396,11 +425,11 @@ class App(tk.Tk):
         # componer las miniaturas) pero se empaqueta antes que "TEXTOS" para
         # que aparezca visualmente arriba de todo, como pide el diseño.
         from .slides_panel import SlidesPanel
-        self.slides_panel = SlidesPanel(left, self, bg=PANEL, panel_bg=PANEL,
+        self.slides_panel = SlidesPanel(inner, self, bg=PANEL, panel_bg=PANEL,
                                          accent=ACCENT, text_color=TEXT, muted_color=MUTED)
         self.slides_panel.pack(fill=tk.X, padx=16, pady=(16, 4), before=lbl_textos)
 
-        tk.Label(left, textvariable=self.v_status, bg=PANEL, fg=MUTED,
+        tk.Label(inner, textvariable=self.v_status, bg=PANEL, fg=MUTED,
                  font=("Segoe UI", 9), wraplength=250, justify="left").pack(
             anchor="w", pady=(6, 12), **pad)
 
