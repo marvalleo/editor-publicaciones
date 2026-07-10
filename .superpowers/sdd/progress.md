@@ -326,3 +326,30 @@ Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de
   posterior, doble iteracion de LAYOUTS en vez de recolectar bboxes en el primer loop) que
   vienen del propio texto del plan, no del implementador -> no bloqueantes en un script de
   verificacion manual, no ameritan ciclo de fix.
+
+# Revision final de rama completa (Layouts A-E, cierre Fase 5 sub-fase 1)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Coherencia
+preview<->export verificada end-to-end (_build_layers_for/app.py y _layers_from_slide/
+exporter.py leen x/y/w/h/size directo del modelo, mismos campos que tocan los layouts).
+plan_aplicar_layout confirmado puro en todos los casos (valores float, sin aliasing).
+Alcance respetado: solo lamina activa, foto de fondo nunca tocada (sin clave ("photo",
+None) en LAYOUTS), sin capas agregadas/quitadas. Dirty-flag correcto via CommandStack.
+
+1 hallazgo Minor nuevo (no detectado en las revisiones por-task porque ninguna tenia
+capa seleccionada al aplicar el layout): el panel de propiedades quedaba desactualizado
+tras aplicar un layout con una capa seleccionada (_render_now no reconstruye el panel).
+Corregido agregando self._build_property_panel() en App._apply_layout (commit siguiente
+a la revision final), mas el ajuste de setUp en TestApplyLayout para stubear ese metodo
+igual que las demas clases de test que ejercitan comandos con efectos de UI.
+
+3 hallazgos Minor ya conocidos de las revisiones por-task, reconfirmados como benignos:
+(1) plan_aplicar_layout sin guard "skip si no cambio" (a diferencia de plan_copia_estilo);
+(2) dict "imagenes" sin lectura + doble iteracion en el script de verificacion (cosmetico,
+script manual); (3) import sin uso en Tarea 3, ya corregido en la misma rama.
+
+Suite final: 349 tests OK.
+
+Veredicto: aprobada para merge a main. Con esto se cierra la primera sub-fase de Fase 5
+del roadmap (Layouts A-E). Quedan paleta de colores y libreria de copys como proximas
+sub-fases, con specs separadas.
