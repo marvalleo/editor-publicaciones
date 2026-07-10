@@ -605,7 +605,7 @@ class TestApplyLayout(unittest.TestCase):
     def test_repositions_title_of_active_slide(self):
         App._apply_layout(self.app, "B")
         titulo = self.app.slide.layers[2]
-        self.assertEqual((titulo.x, titulo.y, titulo.size), (0.12, 0.44, 0.080))
+        self.assertEqual((titulo.x, titulo.y, titulo.size), (0.074, 0.189, 0.079))
 
     def test_does_not_touch_text_content(self):
         App._apply_layout(self.app, "D")

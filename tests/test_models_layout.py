@@ -23,10 +23,10 @@ class TestPlanAplicarLayout(unittest.TestCase):
         titulo = self.slide.layers[2]
         subtitulo = self.slide.layers[3]
         caja = self.slide.layers[4]
-        self.assertEqual((titulo.x, titulo.y, titulo.size), (0.12, 0.44, 0.080))
-        self.assertEqual((subtitulo.x, subtitulo.y, subtitulo.size), (0.12, 0.535, 0.045))
-        self.assertEqual((caja.x, caja.y, caja.w), (0.12, 0.80, 0.76))
-        self.assertEqual((logo.x, logo.y, logo.w, logo.h), (0.40, 0.022, 0.20, 0.20))
+        self.assertEqual((titulo.x, titulo.y, titulo.size), (0.074, 0.189, 0.079))
+        self.assertEqual((subtitulo.x, subtitulo.y, subtitulo.size), (0.076, 0.356, 0.050))
+        self.assertEqual((caja.x, caja.y, caja.w, caja.size), (0.067, 0.463, 0.463, 0.035))
+        self.assertEqual((logo.x, logo.y, logo.w, logo.h), (0.072, 0.046, 0.139, 0.111))
 
     def test_no_toca_el_contenido_de_las_capas(self):
         self._aplicar("D")

@@ -36,13 +36,20 @@ class TestLayoutsData(unittest.TestCase):
             campos = layout["campos"].get(("box", None), {})
             self.assertNotIn("h", campos, f"{layout_id}/box no debe tener h")
 
-    def test_layout_a_coincide_con_valores_por_defecto(self):
+    def test_layout_a_coincide_con_el_instructivo_de_medidas_exactas(self):
         campos = LAYOUTS["A"]["campos"]
         self.assertEqual(campos[("logo", None)],
-                          {"x": 0.40, "y": 0.022, "w": 0.20, "h": 0.20})
-        self.assertEqual(campos[("text", "title")], {"x": 0.055, "y": 0.42, "size": 0.087})
-        self.assertEqual(campos[("text", "subtitle")], {"x": 0.50, "y": 0.55, "size": 0.050})
-        self.assertEqual(campos[("box", None)], {"x": 0.05, "y": 0.808, "w": 0.90})
+                          {"x": 0.421, "y": 0.041, "w": 0.157, "h": 0.126})
+        self.assertEqual(campos[("text", "title")], {"x": 0.093, "y": 0.181, "size": 0.086})
+        self.assertEqual(campos[("text", "subtitle")], {"x": 0.157, "y": 0.276, "size": 0.050})
+        self.assertEqual(campos[("box", None)],
+                          {"x": 0.167, "y": 0.363, "w": 0.667, "size": 0.035})
+
+    def test_layout_d_no_reposiciona_la_caja(self):
+        # Layout D ("Minimal premium") pide explícitamente evitar una caja
+        # de beneficio grande -> no incluye clave ("box", None), la caja
+        # queda donde estaba sin tocarse al aplicar D.
+        self.assertNotIn(("box", None), LAYOUTS["D"]["campos"])
 
 
 if __name__ == "__main__":
