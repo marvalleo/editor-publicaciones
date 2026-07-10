@@ -28,10 +28,11 @@ SIZE_RANGE = {
     "sub":   (0.02, 0.10),
     "desc":  (0.015, 0.07),
     "cta":   (0.015, 0.07),
+    "free":  (0.02, 0.12),
 }
 
 LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción",
-          "cta": "CTA", "line": "Línea", "dots": "Puntos"}
+          "cta": "CTA", "line": "Línea", "dots": "Puntos", "free": "Texto"}
 
 # Rangos de los ajustes fotográficos, alineados a los clamps de render.py
 ADJUST_RANGE = {
@@ -273,6 +274,9 @@ class App(tk.Tk):
             fill=tk.X, pady=(0, 4), **pad)
         tk.Button(left, text="+ Agregar puntos", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_dots_layer).pack(
+            fill=tk.X, pady=(0, 4), **pad)
+        tk.Button(left, text="+ Agregar texto", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._add_text_layer).pack(
             fill=tk.X, pady=(0, 10), **pad)
 
         # Foto
@@ -573,6 +577,19 @@ class App(tk.Tk):
         self._refresh_layers_list()
         self._schedule_render()
 
+    def _add_text_layer(self):
+        from .models import TextLayer
+        from .commands import AddLayerCommand
+        new_z = max((l.z for l in self.slide.layers), default=0) + 1
+        new_layer = TextLayer(name="Texto", role="free", z=new_z,
+                               text="Texto libre", x=0.10, y=0.50, size=0.04)
+        index = len(self.slide.layers)
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
+        self._selected = new_layer
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
     def _delete_layer(self, layer):
         from .commands import DeleteLayerCommand
         self.commands.push(DeleteLayerCommand(self.slide.layers, layer))
@@ -677,7 +694,21 @@ class App(tk.Tk):
                 "<FocusOut>",
                 lambda e, l=layer, old=layer.text, v=cta_text_var:
                     self._on_cta_text_commit(l, old, v.get()))
-        if kind in ("title", "sub"):
+        if kind == "free":
+            tk.Label(card, text="Texto", bg=PANEL, fg=TEXT,
+                     font=("Segoe UI", 8)).pack(anchor="w", pady=(8, 0))
+            free_text = tk.Text(card, height=3, bg=FIELD, fg=TEXT,
+                                 insertbackground=TEXT, relief="flat", bd=2,
+                                 font=("Segoe UI", 9),
+                                 state=tk.DISABLED if disabled else tk.NORMAL)
+            free_text.insert("1.0", layer.text)
+            free_text.pack(fill=tk.X, pady=(2, 6))
+            free_text.bind(
+                "<FocusOut>",
+                lambda e, l=layer, old=layer.text, w=free_text:
+                    self._on_cta_text_commit(l, old, w.get("1.0", "end-1c")))
+            self._color_picker(card, layer, "color", "Color del texto", disabled=disabled)
+        if kind in ("title", "sub", "free"):
             self._build_text_style_section(card, layer, token, disabled)
         if kind not in ("line", "dots"):
             self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
@@ -1008,6 +1039,8 @@ class App(tk.Tk):
             return "line"
         if layer.type == "dots":
             return "dots"
+        if layer.type == "text" and layer.role == "free":
+            return "free"
         return None
 
     def _token_for_layer(self, layer):
@@ -1660,6 +1693,16 @@ class App(tk.Tk):
                                 "line_spacing": layer.line_spacing,
                                 "letter_spacing": layer.letter_spacing,
                                 "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width})
+            elif layer.type == "text" and layer.role == "free":
+                layers.append({"type": "free", "key": layer.id, "text": layer.text,
+                                "x": layer.x, "y": layer.y, "size": layer.size,
+                                "opacity": layer.opacity, "rotation": layer.rotation,
+                                "font_family": layer.font_family, "bold": layer.bold,
+                                "italic": layer.italic, "underline": layer.underline,
+                                "line_spacing": layer.line_spacing,
+                                "letter_spacing": layer.letter_spacing,
+                                "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width,
+                                "color": layer.color})
             elif layer.type == "box":
                 es_desc_activa = es_activa and layer is self._layer_by_kind("desc", slide)
                 text = self.txt_desc.get("1.0", "end-1c") if es_desc_activa else layer.text

@@ -94,6 +94,7 @@ class TextLayer(Layer):
     letter_spacing: float = 0.0
     stroke_on: bool = False
     stroke_width: float = 0.0
+    color: list = field(default_factory=lambda: list(BLANCO) + [255])
 
 
 @dataclass

@@ -249,3 +249,57 @@ Hallazgos de revision (agente independiente, modelo mas capaz) y correccion:
 Suite final: 312 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge a main.
+
+# Progreso — Fase 4 (cierre): bloques de texto libre
+
+Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
+
+- Tarea 1 (modelo: color en TextLayer): complete (commits b1299ea..23ad92e, review clean, 313 tests).
+  Hallazgo corregido en el momento (no llego a revision, se detecto antes): el brief tenia un dato
+  erroneo (asumia que BLANCO ya era el crema de marca #F7F1E8 sin verificar el valor real en
+  constants.py, que era blanco puro). El implementador seteo BLANCO=(247,241,232) siguiendo el
+  brief al pie de la letra, lo cual habria cambiado el color de titulo/subtitulo/caja/CTA en toda
+  la app (BLANCO se usa globalmente en render.py). Revertido en un segundo commit: constants.py y
+  palette.py vuelven a su estado exacto original (diff neto cero verificado), TextLayer.color
+  queda en list(BLANCO)+[255] = [255,255,255,255], el blanco real que usa hoy el titulo. El crema
+  de PALETA_PRINCIPAL es data de paleta para la futura Fase 5, todavia no esta cableada a compose().
+- Tarea 2 (render: rama free con pipeline unico): complete (commit 4d6ba25, review clean, 318 tests).
+  Desviacion justificada del implementador: el test de color del brief muestreaba el pixel exacto
+  del centro geometrico del bbox, que para el texto "Bloque de prueba" en Lato-Regular caia en un
+  hueco entre letras (transparente) por coincidencia de fuente/texto, no por un bug de render.
+  Corregido a buscar el primer pixel opaco de la fila (verificado por el revisor que sigue
+  distinguiendo color propio vs. color de marca correctamente). Nota Minor no bloqueante: el
+  comentario del test dice "mas cercano al centro" pero en realidad es "primero de izquierda a
+  derecha" — cosmetico, no afecta la cobertura.
+- Tarea 3 (adaptadores app.py/_build_layers_for + exporter.py/_layers_from_slide): complete
+  (commit 11609bb, review clean, 320 tests)
+- Tarea 4 (boton "+ Agregar texto" + _add_text_layer): complete (commit b5667b2, review clean, 321 tests)
+- Tarea 5 (panel de propiedades: reconoce free, texto multilinea + color picker, reusa
+  _build_text_style_section y _on_cta_text_commit sin duplicar): complete (commit 623e421,
+  review clean, 325 tests). Nota Minor no bloqueante: tk.Text sin wrap="word" (podria cortar
+  palabras a la mitad en el editor), omision del propio brief, no del implementador.
+- Tarea 6 (verificacion headless de cierre): complete, HEADLESS_OK (325 tests)
+
+# Revision final de rama completa (bloques de texto libre, cierre Fase 4)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Confirmado con
+`git diff` directo que dcpub/constants.py y dcpub/presets/palette.py tienen diff neto CERO entre
+el inicio y el final de la rama (el incidente de BLANCO de la Tarea 1 quedo completamente
+neutralizado). Rama "free" en compose() verificada como pipeline unico sin dual-path/gating
+(a diferencia de title/sub), reusa integramente los helpers de texto rico sin duplicar logica,
+y correctamente omite la sombra fija de marca. Encadenamiento de campos color/font_family/rotation
+verificado extremo a extremo: panel de propiedades -> adaptadores (app.py/exporter.py, mismas
+claves en preview y export) -> compose(). Multi-instancia confirmada segura por construccion
+(bbox_key por layer.id, sin asuncion de instancia canonica como title/sub). Proyectos legado
+cargan bien via default del dataclass (color nunca se lee de un dict crudo antes de normalizar
+al modelo).
+
+3 hallazgos Minor no bloqueantes, ya registrados en tareas anteriores: (1) tk.Text sin
+wrap="word" en el editor de texto libre (omision del brief, cosmetico); (2) comentario desactualizado
+en test_uses_own_color_not_brand_colors (dice "mas cercano al centro", en realidad es "primero de
+izquierda a derecha"); (3) align="left" fijo para bloques libres, consistente con title/sub, sin
+control de alineacion (fuera de alcance de esta sub-fase).
+
+Suite final: 325 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de Fase 4 del roadmap.

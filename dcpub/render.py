@@ -707,6 +707,57 @@ def compose(layers, canvas_size, font_manager, palette=None):
             draw = ImageDraw.Draw(canvas)
             bboxes[bbox_key] = (px, py, px + total_w, py + total_h)
 
+        elif kind == "free":
+            text = layer["text"]
+            if text.strip():
+                tsz = max(8, int(W * layer.get("size", 0.05)))
+                font_f = font_manager.load("body", tsz, family=layer.get("font_family", ""))
+                tx = int(layer["x"] * W)
+                ty = int(layer["y"] * H)
+                max_w = W - tx - margin
+                lines = []
+                for part in text.split("\n"):
+                    part = part.strip()
+                    if part:
+                        lines += wrap_text(part, font_f, max_w, draw)
+                line_spacing = layer.get("line_spacing", 0) or 1.22
+                lh = int(tsz * line_spacing)
+                letter_spacing_px = int(tsz * layer.get("letter_spacing", 0))
+                bold = layer.get("bold", False)
+                stroke_on = layer.get("stroke_on", False)
+                border_px = int(tsz * layer.get("stroke_width", 0)) if stroke_on else 0
+                bold_px = int(tsz * BOLD_STROKE_FRACTION) if bold else 0
+                stroke_width_total = border_px + bold_px
+
+                text_color_value = layer.get("color", BLANCO + (255,))
+                text_color = _apply_opacity(text_color_value, opacity)
+                stroke_fill = (_apply_opacity(TEXT_STROKE_COLOR, opacity)
+                               if stroke_on else text_color)
+
+                block, pad = _render_text_lines_to_image(
+                    lines, font_f, fill=text_color, line_height=lh,
+                    letter_spacing_px=letter_spacing_px,
+                    stroke_width=stroke_width_total, stroke_fill=stroke_fill,
+                    underline=layer.get("underline", False), align="left")
+
+                pre_w, pre_h = block.size
+                center_x = (tx - pad) + pre_w / 2
+                center_y = (ty - pad) + pre_h / 2
+
+                if layer.get("italic", False):
+                    block = _apply_italic_shear(block)
+                rotation = layer.get("rotation", 0.0)
+                if rotation:
+                    block = _apply_rotation(block, rotation)
+
+                paste_x = int(center_x - block.width / 2)
+                paste_y = int(center_y - block.height / 2)
+                canvas.alpha_composite(block, (paste_x, paste_y))
+                draw = ImageDraw.Draw(canvas)
+
+                widest = pre_w - 2 * pad
+                bboxes[bbox_key] = (tx, ty, tx + max(widest, 10), ty + max(pre_h - 2 * pad, 1))
+
         elif kind == "desc":
             description = layer["text"]
             if description.strip():

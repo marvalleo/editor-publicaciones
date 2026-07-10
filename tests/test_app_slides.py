@@ -691,6 +691,25 @@ class TestBuildLayersForDotsLayer(unittest.TestCase):
         self.assertEqual(dots_dict["active"], 1)
 
 
+class TestBuildLayersForFreeText(unittest.TestCase):
+    def test_build_layers_for_includes_free_text_block(self):
+        from dcpub.models import TextLayer
+        app = _make_app_with_two_slides()
+        libre = TextLayer(name="Texto libre", role="free", text="Hola mundo",
+                          x=0.2, y=0.6, size=0.04, color=[1, 2, 3, 200],
+                          font_family="lato", bold=True, rotation=7.0)
+        app.slide.layers.append(libre)
+
+        layers = App._build_layers_for(app, app.slide)
+
+        libre_capa = next(c for c in layers if c["type"] == "free")
+        self.assertEqual(libre_capa["text"], "Hola mundo")
+        self.assertEqual(libre_capa["color"], [1, 2, 3, 200])
+        self.assertEqual(libre_capa["font_family"], "lato")
+        self.assertTrue(libre_capa["bold"])
+        self.assertEqual(libre_capa["rotation"], 7.0)
+
+
 class TestAddDotsLayer(unittest.TestCase):
     def setUp(self):
         self.app = _make_app_with_two_slides()
@@ -717,6 +736,27 @@ class TestKindOfDotsLayer(unittest.TestCase):
         app = App.__new__(App)
 
         self.assertEqual(App._kind_of(app, DotsLayer()), "dots")
+
+
+class TestAddTextLayer(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.calls = []
+        self.app._build_property_panel = lambda: self.calls.append("props")
+        self.app._refresh_layers_list = lambda: self.calls.append("layers")
+        self.app._schedule_render = lambda: self.calls.append("render")
+
+    def test_add_text_layer_appends_free_text_and_selects_it(self):
+        App._add_text_layer(self.app)
+
+        libre = self.app.slide.layers[-1]
+        self.assertEqual(libre.type, "text")
+        self.assertEqual(libre.role, "free")
+        self.assertEqual(libre.name, "Texto")
+        self.assertIs(self.app._selected, libre)
+        self.assertEqual(self.calls, ["props", "layers", "render"])
 
 
 class _FakeEvent:

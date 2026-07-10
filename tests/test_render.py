@@ -807,5 +807,65 @@ class TestSubtitleRichText(unittest.TestCase):
         self.assertNotEqual(list(img_normal.getdata()), list(img_rotated.getdata()))
 
 
+class TestFreeTextLayerRender(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "free", "key": "libre", "text": "Bloque de prueba",
+                "x": 0.1, "y": 0.4, "size": 0.05, "opacity": 1.0,
+                "color": [255, 0, 0, 255]}
+        base.update(overrides)
+        return base
+
+    def test_defaults_produce_a_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer()], (1000, 1000), fm)
+        self.assertIn("libre", bboxes)
+
+    def test_uses_own_color_not_brand_colors(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img, bboxes = compose([self._layer(color=[255, 0, 0, 255])], (1000, 1000), fm)
+        x0, y0, x1, y1 = bboxes["libre"]
+        mid_y = (y0 + y1) // 2
+        # Se busca el pixel opaco mas cercano al centro geometrico en vez de
+        # exigir tinta exactamente en el punto medio: con texto real, el
+        # punto medio exacto puede caer en el hueco entre letras/palabras
+        # segun la fuente, sin que eso indique un color incorrecto.
+        opaque = [img.getpixel((x, mid_y)) for x in range(x0, x1)
+                  if img.getpixel((x, mid_y))[3] > 0]
+        self.assertTrue(opaque, "se esperaba al menos un pixel de tinta en la fila media")
+        self.assertEqual(opaque[0][:3], (255, 0, 0))
+
+    def test_no_forced_shadow_behind_text(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img, bboxes = compose(
+            [self._layer(x=0.3, y=0.3, color=[255, 255, 255, 255])], (1000, 1000), fm)
+        x0, y0, x1, y1 = bboxes["libre"]
+        # 3px a la derecha/abajo del bbox (offset de sombra de titulo/sub)
+        # debe seguir transparente: un bloque libre no lleva sombra forzada.
+        self.assertEqual(img.getpixel((x1 + 3, y1 + 3))[3], 0)
+
+    def test_bold_italic_stroke_rotation_change_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_plain, _ = compose([self._layer()], (1000, 1000), fm)
+        img_styled, _ = compose(
+            [self._layer(bold=True, italic=True, stroke_on=True,
+                         stroke_width=0.03, rotation=12.0)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_plain.getdata()), list(img_styled.getdata()))
+
+    def test_font_family_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, _ = compose([self._layer(font_family="")], (1000, 1000), fm)
+        img_playfair, _ = compose([self._layer(font_family="playfair")], (1000, 1000), fm)
+        self.assertNotEqual(list(img_default.getdata()), list(img_playfair.getdata()))
+
+
 if __name__ == "__main__":
     unittest.main()
