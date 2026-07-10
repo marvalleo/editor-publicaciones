@@ -70,6 +70,26 @@ class TestNestedAdjustParams(unittest.TestCase):
         self.assertEqual(self.foto.adjust["brightness"], 1.0)
 
 
+class TestLineSpacingDisplayFallback(unittest.TestCase):
+    def setUp(self):
+        from dcpub.models import TextLayer
+        self.app = App.__new__(App)
+        self.app.project = crear_proyecto_por_defecto("foto.jpg")
+        self.app.slide = self.app.project.slides[0]
+        self.layer = TextLayer(text="Hola", role="title", line_spacing=0.0)
+        self.app.slide.layers.append(self.layer)
+        self.token = self.layer.id
+
+    def test_default_zero_displays_as_render_fallback(self):
+        value = App._get_layer_value(self.app, self.token, "line_spacing")
+        self.assertEqual(value, 1.22)
+
+    def test_explicit_value_displays_as_is(self):
+        self.layer.line_spacing = 1.6
+        value = App._get_layer_value(self.app, self.token, "line_spacing")
+        self.assertEqual(value, 1.6)
+
+
 class TestPhotoAdjustSection(unittest.TestCase):
     def setUp(self):
         self.app = App.__new__(App)
@@ -241,7 +261,12 @@ class TestToggleTextFlag(unittest.TestCase):
         self.app = App.__new__(App)
         self.app.commands = CommandStack()
         self.app._schedule_render = lambda: None
+        self._rebuild_calls = 0
+        self.app._build_property_panel = self._count_rebuild
         self.layer = TextLayer(text="Hola", role="title")
+
+    def _count_rebuild(self):
+        self._rebuild_calls += 1
 
     def test_toggle_bold_flips_value_and_is_undoable(self):
         App._toggle_text_flag(self.app, self.layer, "bold")
@@ -252,6 +277,14 @@ class TestToggleTextFlag(unittest.TestCase):
     def test_toggle_underline_flips_value(self):
         App._toggle_text_flag(self.app, self.layer, "underline")
         self.assertTrue(self.layer.underline)
+
+    def test_toggle_bold_does_not_rebuild_panel(self):
+        App._toggle_text_flag(self.app, self.layer, "bold")
+        self.assertEqual(self._rebuild_calls, 0)
+
+    def test_toggle_stroke_on_rebuilds_panel_to_refresh_stroke_width_disabled_state(self):
+        App._toggle_text_flag(self.app, self.layer, "stroke_on")
+        self.assertEqual(self._rebuild_calls, 1)
 
 
 class TestFontFamilyChange(unittest.TestCase):

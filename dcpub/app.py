@@ -876,6 +876,8 @@ class App(tk.Tk):
         from .commands import PropertyChangeCommand
         old_value = getattr(layer, attr)
         self.commands.push(PropertyChangeCommand(layer, attr, old_value, not old_value))
+        if attr == "stroke_on":
+            self._build_property_panel()
         self._schedule_render()
 
     def _on_font_family_change(self, layer, new_value):
@@ -979,6 +981,8 @@ class App(tk.Tk):
             return getattr(layer, group)[key]
         if self._kind_of(layer) == "logo" and param == "size":
             return layer.w
+        if param == "line_spacing":
+            return getattr(layer, param) or 1.22
         return getattr(layer, param)
 
     def _set_layer_value(self, elem, param, value):
