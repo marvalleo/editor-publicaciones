@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
-from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE
+from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE, TEXT_STROKE_COLOR
 
 _bg_cache = {"key": None, "img": None}
 
@@ -288,6 +288,95 @@ def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.
     return photo.copy()
 
 
+BOLD_STROKE_FRACTION = 0.06  # grosor sintetico extra cuando bold=True, fraccion del tamaño de fuente
+
+
+def _measure_line_width(draw_ctx, text, font, letter_spacing_px):
+    """Ancho en px de `text` con `font`, sumando `letter_spacing_px` entre
+    cada caracter. Con letter_spacing_px=0 equivale a textbbox normal."""
+    if letter_spacing_px == 0:
+        bbox = draw_ctx.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0]
+    total = 0
+    for ch in text:
+        bbox = draw_ctx.textbbox((0, 0), ch, font=font)
+        total += (bbox[2] - bbox[0]) + letter_spacing_px
+    return max(0, total - letter_spacing_px)
+
+
+def _draw_tracked_line(draw_ctx, xy, text, font, fill, letter_spacing_px,
+                        stroke_width=0, stroke_fill=None):
+    """Dibuja `text` en `xy` con tracking manual si letter_spacing_px != 0
+    (caracter por caracter); si es 0, usa draw.text normal (camino rapido,
+    sin cambio de comportamiento respecto al codigo legado)."""
+    if letter_spacing_px == 0:
+        draw_ctx.text(xy, text, font=font, fill=fill,
+                       stroke_width=stroke_width, stroke_fill=stroke_fill)
+        return
+    x, y = xy
+    for ch in text:
+        draw_ctx.text((x, y), ch, font=font, fill=fill,
+                       stroke_width=stroke_width, stroke_fill=stroke_fill)
+        bbox = draw_ctx.textbbox((0, 0), ch, font=font)
+        x += (bbox[2] - bbox[0]) + letter_spacing_px
+
+
+def _render_text_lines_to_image(lines, font, *, fill, line_height,
+                                 letter_spacing_px=0, stroke_width=0,
+                                 stroke_fill=None, underline=False,
+                                 shadow_offset=None, shadow_fill=None,
+                                 align="left"):
+    """Renderiza `lines` (lista de strings, una por linea) a una imagen RGBA
+    ajustada al contenido, con tracking/stroke/subrayado/sombra ya
+    horneados. No aplica italica ni rotacion (eso se hace despues, sobre la
+    imagen devuelta). Devuelve (imagen, pad), donde `pad` es el margen
+    interno agregado a cada lado (necesario para que el stroke no se corte
+    en los bordes) — quien llama debe restar `pad` de la posicion de anclaje
+    original al pegar la imagen resultante en el lienzo."""
+    probe = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    probe_draw = ImageDraw.Draw(probe)
+    widths = [_measure_line_width(probe_draw, line, font, letter_spacing_px)
+              for line in lines]
+    block_w = max(widths, default=0)
+    pad = max(4, stroke_width * 2 + 4)
+    block_h = max(1, len(lines)) * line_height
+
+    img = Image.new("RGBA", (block_w + pad * 2, block_h + pad * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for i, (line, lw) in enumerate(zip(lines, widths)):
+        ly = pad + i * line_height
+        lx = pad if align == "left" else pad + (block_w - lw) // 2
+        if shadow_offset:
+            dx, dy = shadow_offset
+            _draw_tracked_line(d, (lx + dx, ly + dy), line, font,
+                                shadow_fill, letter_spacing_px)
+        _draw_tracked_line(d, (lx, ly), line, font, fill, letter_spacing_px,
+                            stroke_width=stroke_width, stroke_fill=stroke_fill)
+        if underline:
+            uy = ly + line_height - max(1, int(line_height * 0.08))
+            d.line([(lx, uy), (lx + lw, uy)], fill=fill,
+                   width=max(1, int(line_height * 0.05)))
+    return img, pad
+
+
+def _apply_italic_shear(img, factor=0.22):
+    """Inclina `img` horizontalmente (shear) para simular itálica. `factor`
+    es la pendiente del corte (positivo = inclina hacia la derecha arriba)."""
+    w, h = img.size
+    xshift = int(round(abs(factor) * h))
+    new_w = w + xshift
+    coeffs = (1, factor, -xshift if factor > 0 else 0, 0, 1, 0)
+    return img.transform((new_w, h), Image.AFFINE, coeffs, resample=Image.BICUBIC)
+
+
+def _apply_rotation(img, degrees):
+    """Rota `img` `degrees` grados (sentido horario positivo), expandiendo
+    el lienzo para no recortar contenido. Sin cambios si degrees es 0."""
+    if not degrees:
+        return img
+    return img.rotate(-degrees, expand=True, resample=Image.BICUBIC)
+
+
 def compose(layers, canvas_size, font_manager, palette=None):
     """
     Compone la publicación a partir de una lista de capas.
@@ -365,75 +454,190 @@ def compose(layers, canvas_size, font_manager, palette=None):
             title = layer["text"]
             if title.strip():
                 tsz = max(10, int(W * layer["size"]))
-                font_t = font_manager.load("title", tsz)
-                tx = int(layer["x"] * W)
-                ty = int(layer["y"] * H)
-                max_w = W - tx - margin
-                lines = []
-                for part in title.split("\n"):
-                    part = part.strip()
-                    if part:
-                        lines += wrap_text(part, font_t, max_w, draw)
-                lh = int(tsz * 1.22)
-                widest = 0
-                shadow_color = _apply_opacity((0, 0, 0, 160), opacity)
-                text_color = _apply_opacity(BLANCO + (255,), opacity)
-                if opacity < 1.0:
-                    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                    text_draw = ImageDraw.Draw(text_layer)
-                    for i, line in enumerate(lines):
-                        yy = ty + i * lh
-                        text_draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
-                        text_draw.text((tx, yy), line, font=font_t, fill=text_color)
-                        bb = draw.textbbox((tx, yy), line, font=font_t)
-                        widest = max(widest, bb[2] - tx)
-                    canvas = Image.alpha_composite(canvas, text_layer)
+                has_rich_text = any(layer.get(k) for k in ["font_family", "bold", "italic", "underline", "letter_spacing", "stroke_on", "rotation"]) or layer.get("line_spacing", 0)
+
+                if has_rich_text:
+                    # Nuevo pipeline de texto rico
+                    font_t = font_manager.load("title", tsz, family=layer.get("font_family", ""))
+                    tx = int(layer["x"] * W)
+                    ty = int(layer["y"] * H)
+                    max_w = W - tx - margin
+                    lines = []
+                    for part in title.split("\n"):
+                        part = part.strip()
+                        if part:
+                            lines += wrap_text(part, font_t, max_w, draw)
+                    line_spacing = layer.get("line_spacing", 0) or 1.22
+                    lh = int(tsz * line_spacing)
+                    letter_spacing_px = int(tsz * layer.get("letter_spacing", 0))
+                    bold = layer.get("bold", False)
+                    stroke_on = layer.get("stroke_on", False)
+                    border_px = int(tsz * layer.get("stroke_width", 0)) if stroke_on else 0
+                    bold_px = int(tsz * BOLD_STROKE_FRACTION) if bold else 0
+                    stroke_width_total = border_px + bold_px
+
+                    shadow_color = _apply_opacity((0, 0, 0, 160), opacity)
+                    text_color = _apply_opacity(BLANCO + (255,), opacity)
+                    stroke_fill = (_apply_opacity(TEXT_STROKE_COLOR, opacity)
+                                   if stroke_on else text_color)
+
+                    block, pad = _render_text_lines_to_image(
+                        lines, font_t, fill=text_color, line_height=lh,
+                        letter_spacing_px=letter_spacing_px,
+                        stroke_width=stroke_width_total, stroke_fill=stroke_fill,
+                        underline=layer.get("underline", False),
+                        shadow_offset=(3, 3), shadow_fill=shadow_color, align="left")
+
+                    pre_w, pre_h = block.size
+                    center_x = (tx - pad) + pre_w / 2
+                    center_y = (ty - pad) + pre_h / 2
+
+                    if layer.get("italic", False):
+                        block = _apply_italic_shear(block)
+                    rotation = layer.get("rotation", 0.0)
+                    if rotation:
+                        block = _apply_rotation(block, rotation)
+
+                    paste_x = int(center_x - block.width / 2)
+                    paste_y = int(center_y - block.height / 2)
+                    canvas.alpha_composite(block, (paste_x, paste_y))
                     draw = ImageDraw.Draw(canvas)
+
+                    widest = pre_w - 2 * pad
+                    bboxes[bbox_key] = (tx, ty, tx + max(widest, 10), ty + max(pre_h - 2 * pad, 1))
                 else:
-                    for i, line in enumerate(lines):
-                        yy = ty + i * lh
-                        draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
-                        draw.text((tx, yy), line, font=font_t, fill=text_color)
-                        bb = draw.textbbox((tx, yy), line, font=font_t)
-                        widest = max(widest, bb[2] - tx)
-                bboxes[bbox_key] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
+                    # Legacy fast path: mantiene pixel-identical behavior cuando todos los campos de rich text están en default
+                    font_t = font_manager.load("title", tsz)
+                    tx = int(layer["x"] * W)
+                    ty = int(layer["y"] * H)
+                    max_w = W - tx - margin
+                    lines = []
+                    for part in title.split("\n"):
+                        part = part.strip()
+                        if part:
+                            lines += wrap_text(part, font_t, max_w, draw)
+                    lh = int(tsz * 1.22)
+                    widest = 0
+                    shadow_color = _apply_opacity((0, 0, 0, 160), opacity)
+                    text_color = _apply_opacity(BLANCO + (255,), opacity)
+                    if opacity < 1.0:
+                        text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        text_draw = ImageDraw.Draw(text_layer)
+                        for i, line in enumerate(lines):
+                            yy = ty + i * lh
+                            text_draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
+                            text_draw.text((tx, yy), line, font=font_t, fill=text_color)
+                            bb = draw.textbbox((tx, yy), line, font=font_t)
+                            widest = max(widest, bb[2] - tx)
+                        canvas = Image.alpha_composite(canvas, text_layer)
+                        draw = ImageDraw.Draw(canvas)
+                    else:
+                        for i, line in enumerate(lines):
+                            yy = ty + i * lh
+                            draw.text((tx + 3, yy + 3), line, font=font_t, fill=shadow_color)
+                            draw.text((tx, yy), line, font=font_t, fill=text_color)
+                            bb = draw.textbbox((tx, yy), line, font=font_t)
+                            widest = max(widest, bb[2] - tx)
+                    bboxes[bbox_key] = (tx, ty, tx + max(widest, 10), ty + max(1, len(lines)) * lh)
 
         elif kind == "sub":
             subtitle = layer["text"]
             if subtitle.strip():
                 ssz = max(8, int(W * layer["size"]))
-                font_s = font_manager.load("subtitle", ssz)
-                cx = int(layer["x"] * W)
-                sy = int(layer["y"] * H)
-                bb = draw.textbbox((0, 0), subtitle, font=font_s)
-                sw, sh = bb[2] - bb[0], bb[3] - bb[1]
-                sx = cx - sw // 2
-                ly = sy + sh // 2
-                lw_deco = max(2, int(W * 0.003))
-                line_len = int(W * 0.11)
-                gap = int(W * 0.03)
-                lx1 = max(0, sx - gap - line_len)
-                rx2 = min(W, sx + sw + gap + line_len)
-                line_color = _apply_opacity(VERDE, opacity)
-                deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                deco_draw = ImageDraw.Draw(deco_layer)
-                deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
-                deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
-                canvas = Image.alpha_composite(canvas, deco_layer)
-                draw = ImageDraw.Draw(canvas)
-                if opacity < 1.0:
-                    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                    text_draw = ImageDraw.Draw(text_layer)
-                    text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
-                                   fill=_apply_opacity((0, 0, 0, 130), opacity))
-                    text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                    canvas = Image.alpha_composite(canvas, text_layer)
+                has_rich_text = any(layer.get(k) for k in ["font_family", "bold", "italic", "underline", "letter_spacing", "stroke_on", "rotation"])
+
+                if has_rich_text:
+                    # Nuevo pipeline de texto rico
+                    font_s = font_manager.load("subtitle", ssz, family=layer.get("font_family", ""))
+                    cx = int(layer["x"] * W)
+                    sy = int(layer["y"] * H)
+                    letter_spacing_px = int(ssz * layer.get("letter_spacing", 0))
+                    probe_draw = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+                    sw = _measure_line_width(probe_draw, subtitle, font_s, letter_spacing_px)
+                    bb = draw.textbbox((0, 0), subtitle, font=font_s)
+                    sh = bb[3] - bb[1]
+                    sx = cx - sw // 2
+                    ly = sy + sh // 2
+
+                    lw_deco = max(2, int(W * 0.003))
+                    line_len = int(W * 0.11)
+                    gap = int(W * 0.03)
+                    lx1 = max(0, sx - gap - line_len)
+                    rx2 = min(W, sx + sw + gap + line_len)
+                    line_color = _apply_opacity(VERDE, opacity)
+                    deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    deco_draw = ImageDraw.Draw(deco_layer)
+                    deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
+                    deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                    canvas = Image.alpha_composite(canvas, deco_layer)
                     draw = ImageDraw.Draw(canvas)
+
+                    bold = layer.get("bold", False)
+                    stroke_on = layer.get("stroke_on", False)
+                    border_px = int(ssz * layer.get("stroke_width", 0)) if stroke_on else 0
+                    bold_px = int(ssz * BOLD_STROKE_FRACTION) if bold else 0
+                    stroke_width_total = border_px + bold_px
+                    stroke_fill = (_apply_opacity(TEXT_STROKE_COLOR, opacity)
+                                   if stroke_on else line_color)
+
+                    block, pad = _render_text_lines_to_image(
+                        [subtitle], font_s, fill=line_color, line_height=sh,
+                        letter_spacing_px=letter_spacing_px,
+                        stroke_width=stroke_width_total, stroke_fill=stroke_fill,
+                        underline=layer.get("underline", False),
+                        shadow_offset=(2, 2),
+                        shadow_fill=_apply_opacity((0, 0, 0, 130), opacity), align="left")
+
+                    pre_w, pre_h = block.size
+                    center_x = (sx - pad) + pre_w / 2
+                    center_y = (sy - pad) + pre_h / 2
+
+                    if layer.get("italic", False):
+                        block = _apply_italic_shear(block)
+                    rotation = layer.get("rotation", 0.0)
+                    if rotation:
+                        block = _apply_rotation(block, rotation)
+
+                    paste_x = int(center_x - block.width / 2)
+                    paste_y = int(center_y - block.height / 2)
+                    canvas.alpha_composite(block, (paste_x, paste_y))
+                    draw = ImageDraw.Draw(canvas)
+
+                    bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
                 else:
-                    draw.text((sx + 2, sy + 2), subtitle, font=font_s,
-                              fill=_apply_opacity((0, 0, 0, 130), opacity))
-                    draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
+                    # Legacy fast path: mantiene pixel-identical behavior cuando todos los campos de rich text están en default
+                    font_s = font_manager.load("subtitle", ssz)
+                    cx = int(layer["x"] * W)
+                    sy = int(layer["y"] * H)
+                    bb = draw.textbbox((0, 0), subtitle, font=font_s)
+                    sw, sh = bb[2] - bb[0], bb[3] - bb[1]
+                    sx = cx - sw // 2
+                    ly = sy + sh // 2
+                    lw_deco = max(2, int(W * 0.003))
+                    line_len = int(W * 0.11)
+                    gap = int(W * 0.03)
+                    lx1 = max(0, sx - gap - line_len)
+                    rx2 = min(W, sx + sw + gap + line_len)
+                    line_color = _apply_opacity(VERDE, opacity)
+                    deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    deco_draw = ImageDraw.Draw(deco_layer)
+                    deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
+                    deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                    canvas = Image.alpha_composite(canvas, deco_layer)
+                    draw = ImageDraw.Draw(canvas)
+                    if opacity < 1.0:
+                        text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        text_draw = ImageDraw.Draw(text_layer)
+                        text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                                       fill=_apply_opacity((0, 0, 0, 130), opacity))
+                        text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
+                        canvas = Image.alpha_composite(canvas, text_layer)
+                        draw = ImageDraw.Draw(canvas)
+                    else:
+                        draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                                  fill=_apply_opacity((0, 0, 0, 130), opacity))
+                        draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
+                    bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
         elif kind == "desc":
             description = layer["text"]

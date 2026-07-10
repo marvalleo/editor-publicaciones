@@ -483,5 +483,223 @@ class TestCTABox(unittest.TestCase):
         self.assertIn("cta", bboxes)
 
 
+class TestTrackedTextHelpers(unittest.TestCase):
+    def _font(self):
+        from dcpub.fonts import FontManager
+        return FontManager().load("body", 40)
+
+    def test_measure_line_width_no_spacing_matches_textbbox(self):
+        from dcpub.render import _measure_line_width
+        font = self._font()
+        img = Image.new("RGBA", (1, 1))
+        draw_ctx = ImageDraw.Draw(img)
+        bb = draw_ctx.textbbox((0, 0), "Hola", font=font)
+        expected = bb[2] - bb[0]
+        self.assertEqual(_measure_line_width(draw_ctx, "Hola", font, 0), expected)
+
+    def test_measure_line_width_grows_with_positive_spacing(self):
+        from dcpub.render import _measure_line_width
+        font = self._font()
+        img = Image.new("RGBA", (1, 1))
+        draw_ctx = ImageDraw.Draw(img)
+        w_no_spacing = _measure_line_width(draw_ctx, "Hola", font, 0)
+        w_with_spacing = _measure_line_width(draw_ctx, "Hola", font, 10)
+        self.assertGreater(w_with_spacing, w_no_spacing)
+
+    def test_draw_tracked_line_with_spacing_produces_wider_pixels_than_without(self):
+        from dcpub.render import _draw_tracked_line
+        font = self._font()
+
+        img_tight = Image.new("RGBA", (400, 80), (0, 0, 0, 0))
+        _draw_tracked_line(ImageDraw.Draw(img_tight), (10, 10), "Hola",
+                            font, (255, 255, 255, 255), 0)
+
+        img_spaced = Image.new("RGBA", (400, 80), (0, 0, 0, 0))
+        _draw_tracked_line(ImageDraw.Draw(img_spaced), (10, 10), "Hola",
+                            font, (255, 255, 255, 255), 15)
+
+        bbox_tight = img_tight.getbbox()
+        bbox_spaced = img_spaced.getbbox()
+        self.assertGreater(bbox_spaced[2] - bbox_spaced[0], bbox_tight[2] - bbox_tight[0])
+
+    def test_render_text_lines_to_image_produces_nonempty_image(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img, pad = _render_text_lines_to_image(
+            ["Hola mundo"], font, fill=(255, 255, 255, 255), line_height=48)
+        self.assertIsNotNone(img.getbbox())
+        self.assertGreaterEqual(pad, 0)
+
+    def test_render_text_lines_to_image_underline_adds_pixels_below_text(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_plain, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48, underline=False)
+        img_underline, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48, underline=True)
+        self.assertNotEqual(list(img_plain.getdata()), list(img_underline.getdata()))
+
+    def test_render_text_lines_to_image_shadow_adds_pixels(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_no_shadow, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48)
+        img_shadow, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48,
+            shadow_offset=(3, 3), shadow_fill=(0, 0, 0, 160))
+        self.assertNotEqual(list(img_no_shadow.getdata()), list(img_shadow.getdata()))
+
+    def test_render_text_lines_to_image_stroke_changes_pixels(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_no_stroke, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48)
+        img_stroke, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48,
+            stroke_width=4, stroke_fill=(20, 12, 8, 255))
+        self.assertNotEqual(list(img_no_stroke.getdata()), list(img_stroke.getdata()))
+
+
+class TestItalicAndRotationHelpers(unittest.TestCase):
+    def _sample_image(self):
+        img = Image.new("RGBA", (100, 40), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rectangle([(10, 10), (90, 30)], fill=(255, 255, 255, 255))
+        return img
+
+    def test_italic_shear_widens_image(self):
+        from dcpub.render import _apply_italic_shear
+        img = self._sample_image()
+        sheared = _apply_italic_shear(img)
+        self.assertGreater(sheared.width, img.width)
+        self.assertEqual(sheared.height, img.height)
+
+    def test_italic_shear_preserves_content(self):
+        from dcpub.render import _apply_italic_shear
+        img = self._sample_image()
+        sheared = _apply_italic_shear(img)
+        self.assertIsNotNone(sheared.getbbox())
+
+    def test_rotation_zero_returns_same_image(self):
+        from dcpub.render import _apply_rotation
+        img = self._sample_image()
+        rotated = _apply_rotation(img, 0)
+        self.assertEqual(rotated.size, img.size)
+
+    def test_rotation_nonzero_expands_canvas(self):
+        from dcpub.render import _apply_rotation
+        img = self._sample_image()
+        rotated = _apply_rotation(img, 30)
+        self.assertGreater(rotated.width, img.width)
+
+
+class TestTitleRichText(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "title", "key": "title", "text": "Titulo de prueba",
+                "x": 0.1, "y": 0.4, "size": 0.08, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_defaults_produce_same_bbox_as_before(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer()], (1000, 1000), fm)
+        self.assertIn("title", bboxes)
+
+    def test_bold_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(bold=False)], (1000, 1000), fm)
+        img_bold, _ = compose([self._layer(bold=True)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_bold.getdata()))
+
+    def test_underline_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(underline=False)], (1000, 1000), fm)
+        img_underline, _ = compose([self._layer(underline=True)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_underline.getdata()))
+
+    def test_letter_spacing_changes_bbox_width(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes_tight = compose([self._layer(letter_spacing=0.0)], (1000, 1000), fm)
+        _, bboxes_spaced = compose([self._layer(letter_spacing=0.3)], (1000, 1000), fm)
+        w_tight = bboxes_tight["title"][2] - bboxes_tight["title"][0]
+        w_spaced = bboxes_spaced["title"][2] - bboxes_spaced["title"][0]
+        self.assertGreater(w_spaced, w_tight)
+
+    def test_stroke_on_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_off, _ = compose([self._layer(stroke_on=False)], (1000, 1000), fm)
+        img_on, _ = compose([self._layer(stroke_on=True, stroke_width=0.05)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_off.getdata()), list(img_on.getdata()))
+
+    def test_italic_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(italic=False)], (1000, 1000), fm)
+        img_italic, _ = compose([self._layer(italic=True)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_italic.getdata()))
+
+    def test_rotation_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(rotation=0.0)], (1000, 1000), fm)
+        img_rotated, _ = compose([self._layer(rotation=20.0)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_rotated.getdata()))
+
+    def test_font_family_lato_changes_pixels_vs_default(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, _ = compose([self._layer(font_family="")], (1000, 1000), fm)
+        img_lato, _ = compose([self._layer(font_family="lato")], (1000, 1000), fm)
+        self.assertNotEqual(list(img_default.getdata()), list(img_lato.getdata()))
+
+
+class TestSubtitleRichText(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "sub", "key": "sub", "text": "Subtitulo de prueba",
+                "x": 0.5, "y": 0.55, "size": 0.05, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_defaults_still_produce_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer()], (1000, 1000), fm)
+        self.assertIn("sub", bboxes)
+
+    def test_bold_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(bold=False)], (1000, 1000), fm)
+        img_bold, _ = compose([self._layer(bold=True)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_bold.getdata()))
+
+    def test_font_family_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, _ = compose([self._layer(font_family="")], (1000, 1000), fm)
+        img_playfair, _ = compose([self._layer(font_family="playfair")], (1000, 1000), fm)
+        self.assertNotEqual(list(img_default.getdata()), list(img_playfair.getdata()))
+
+    def test_rotation_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(rotation=0.0)], (1000, 1000), fm)
+        img_rotated, _ = compose([self._layer(rotation=-15.0)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_rotated.getdata()))
+
+
 if __name__ == "__main__":
     unittest.main()

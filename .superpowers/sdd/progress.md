@@ -155,3 +155,56 @@ Otros hallazgos Minor de la revision final (no bloqueantes, no corregidos):
 Suite final: 247 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge.
+
+# Progreso — Fase 4 sub-fase 2 (texto rico por elemento)
+
+Plan: docs/superpowers/plans/2026-07-09-fase4-texto-rico.md
+
+- Tarea 1 (modelo: campos nuevos en TextLayer): complete (commit c96809f, review clean, 248 tests)
+- Tarea 2 (FontManager family + TEXT_STROKE_COLOR): complete (commit 423ee10, review clean, 251 tests)
+- Tarea 3 (render: helpers puros tracking/stroke/subrayado): complete (commit 02c75b9, review clean, 258 tests)
+- Tarea 4 (render: transformaciones italica y rotacion): complete (commit 6217417, review clean, 262 tests)
+- Tarea 5 (render: rama title usa pipeline texto rico): complete (commit d6fe579, 270 tests). Desviacion del
+  brief confirmada y aprobada por el usuario: el brief pedia reemplazar la rama title por UN pipeline unico
+  que reproduce el render legado via defaults; se intento verbatim y rompio
+  test_title_and_sub_opacity_one_matches_original_direct_draw por diferencia real de blending de Pillow entre
+  draw.text() directo sobre canvas opaco (legado, opacity=1.0) vs dibujar en capa transparente + alpha_composite
+  (requerido por el pipeline nuevo para soportar italica/rotacion). Causa raiz confirmada con git stash. El
+  usuario eligio mantener el enfoque dual-path del implementador (rama legado intacta + rama nueva de texto
+  rico via gate has_rich_text) en vez de tolerar la diferencia de pixeles. Aceptado como excepcion documentada
+  al diseno original del plan para Tarea 5 y, por el mismo motivo tecnico, tambien aplica a Tarea 6 (rama sub).
+- Tarea 6 (render: rama sub usa pipeline texto rico): complete (commit f4df729, review clean, 274 tests).
+  Aplico el mismo patron dual-path pre-aprobado en Tarea 5 (instruido directamente al implementador, sin
+  necesidad de ronda de fix): rama legado intacta byte a byte + rama nueva con formulas propias de sub
+  (shadow offset (2,2) y alpha 130, distintas de title (3,3)/160; sin line_spacing en el gate porque sub
+  es una sola linea). Lineas decorativas verificadas sobre geometria sin transformar.
+- Tarea 7 (adaptadores app.py/_build_layers_for + exporter.py/_layers_from_slide): complete
+  (commit 693dddc, review clean, 278 tests)
+- Tarea 8 (panel de propiedades: dropdown fuente + bold/italic/underline/stroke + sliders
+  interlineado/tracking/grosor/rotacion): complete (commit 38cb365, review clean, 282 tests).
+  Nota Minor plan-mandated no bloqueante: _on_font_family_change llama _schedule_render() incluso
+  cuando el valor no cambia (codigo verbatim del brief), desperdicia un render de mas en un no-op.
+- Tarea 9 (verificacion headless de cierre): complete, HEADLESS_OK (282 tests)
+
+# Revision final de rama completa (Fase 4 sub-fase 2: texto rico)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Confirmado end-to-end el
+encadenamiento de campos font_family/bold/stroke_width desde TextLayer (Tarea 1) pasando por los
+adaptadores app.py/exporter.py (Tarea 7) hasta compose() (Tareas 5/6) con nombres de clave
+consistentes; preview y export coinciden exactamente en los mismos 9 campos. Gates has_rich_text
+de title y sub verificados completos (stroke_width es inerte sin stroke_on, que si esta gateado;
+sub omite line_spacing legitimamente por ser una sola linea). Proyectos legado cargan bien via
+defaults del dataclass. Geometria/pad de _render_text_lines_to_image confirmada suficiente para
+que stroke/bold no se corten en los bordes.
+
+5 hallazgos Minor no bloqueantes: (1) default de line_spacing=0.0 queda fuera del rango del
+slider (0.8-2.5), cosmetico; (2) togglear "Contorno" no refresca el estado disabled del slider de
+grosor hasta reabrir el panel; (3) checkboxes/combobox no reflejan undo/redo hasta reconstruir el
+panel (patron preexistente, no regresion); (4) ~40-80 lineas duplicadas de dibujo legado en
+title/sub bajo el gate has_rich_text quedan como candidato a extraccion en Fase 6 (decision
+dual-path ya aprobada por el usuario, no se re-litiga); (5) _on_font_family_change dispara un
+render de mas en no-op (ya registrado en Tarea 8).
+
+Suite final: 282 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge a main.

@@ -234,5 +234,46 @@ class TestCTATextFieldCommit(unittest.TestCase):
         self.assertEqual(len(self.app.commands._undo_stack), 0)
 
 
+class TestToggleTextFlag(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import TextLayer
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app._schedule_render = lambda: None
+        self.layer = TextLayer(text="Hola", role="title")
+
+    def test_toggle_bold_flips_value_and_is_undoable(self):
+        App._toggle_text_flag(self.app, self.layer, "bold")
+        self.assertTrue(self.layer.bold)
+        self.app.commands.undo()
+        self.assertFalse(self.layer.bold)
+
+    def test_toggle_underline_flips_value(self):
+        App._toggle_text_flag(self.app, self.layer, "underline")
+        self.assertTrue(self.layer.underline)
+
+
+class TestFontFamilyChange(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import TextLayer
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app._schedule_render = lambda: None
+        self.app._build_property_panel = lambda: None
+        self.layer = TextLayer(text="Hola", role="title", font_family="")
+
+    def test_change_pushes_command_and_is_undoable(self):
+        App._on_font_family_change(self.app, self.layer, "lato")
+        self.assertEqual(self.layer.font_family, "lato")
+        self.app.commands.undo()
+        self.assertEqual(self.layer.font_family, "")
+
+    def test_same_value_pushes_nothing(self):
+        App._on_font_family_change(self.app, self.layer, "")
+        self.assertEqual(len(self.app.commands._undo_stack), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

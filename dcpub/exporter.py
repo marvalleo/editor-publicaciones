@@ -64,6 +64,15 @@ def _layers_from_slide(slide) -> list[dict]:
                 "y": layer.y,
                 "size": layer.size,
                 "opacity": layer.opacity,
+                "rotation": layer.rotation,
+                "font_family": layer.font_family,
+                "bold": layer.bold,
+                "italic": layer.italic,
+                "underline": layer.underline,
+                "line_spacing": layer.line_spacing,
+                "letter_spacing": layer.letter_spacing,
+                "stroke_on": layer.stroke_on,
+                "stroke_width": layer.stroke_width,
             })
         elif layer.type == "text" and layer.role == "subtitle":
             layers.append({
@@ -74,6 +83,15 @@ def _layers_from_slide(slide) -> list[dict]:
                 "y": layer.y,
                 "size": layer.size,
                 "opacity": layer.opacity,
+                "rotation": layer.rotation,
+                "font_family": layer.font_family,
+                "bold": layer.bold,
+                "italic": layer.italic,
+                "underline": layer.underline,
+                "line_spacing": layer.line_spacing,
+                "letter_spacing": layer.letter_spacing,
+                "stroke_on": layer.stroke_on,
+                "stroke_width": layer.stroke_width,
             })
         elif layer.type == "box":
             layers.append({

@@ -634,6 +634,8 @@ class App(tk.Tk):
                 "<FocusOut>",
                 lambda e, l=layer, old=layer.text, v=cta_text_var:
                     self._on_cta_text_commit(l, old, v.get()))
+        if kind in ("title", "sub"):
+            self._build_text_style_section(card, layer, token, disabled)
         self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
         self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
@@ -691,6 +693,59 @@ class App(tk.Tk):
         lo, hi = OVERLAY_STRENGTH_RANGE
         self._slider(card, token, "overlay.strength", "Intensidad del overlay", lo, hi,
                      disabled=disabled)
+
+    def _build_text_style_section(self, card, layer, token, disabled):
+        from .constants import FAMILY_FONT_FILES
+        state = tk.DISABLED if disabled else tk.NORMAL
+
+        tk.Label(card, text="Fuente", bg=PANEL, fg=TEXT,
+                 font=("Segoe UI", 8)).pack(anchor="w", pady=(8, 0))
+        family_labels = {"": "Marca (por rol)", "playfair": "Playfair Display",
+                          "dancing": "Dancing Script", "lato": "Lato"}
+        family_keys = [""] + list(FAMILY_FONT_FILES.keys())
+        family_var = tk.StringVar(value=family_labels.get(layer.font_family, "Marca (por rol)"))
+        family_combo = ttk.Combobox(card, textvariable=family_var,
+                                     values=[family_labels[k] for k in family_keys],
+                                     state="readonly" if not disabled else tk.DISABLED,
+                                     font=("Segoe UI", 9))
+        family_combo.pack(fill=tk.X, pady=(2, 6))
+        label_to_key = {v: k for k, v in family_labels.items()}
+        family_combo.bind(
+            "<<ComboboxSelected>>",
+            lambda e, l=layer, v=family_var:
+                self._on_font_family_change(l, label_to_key[v.get()]))
+
+        style_row = tk.Frame(card, bg=PANEL)
+        style_row.pack(fill=tk.X, pady=(0, 6))
+        bold_var = tk.BooleanVar(value=layer.bold)
+        tk.Checkbutton(style_row, text="Negrita", variable=bold_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_text_flag(layer, "bold")).pack(side=tk.LEFT)
+        italic_var = tk.BooleanVar(value=layer.italic)
+        tk.Checkbutton(style_row, text="Cursiva", variable=italic_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_text_flag(layer, "italic")).pack(side=tk.LEFT, padx=(8, 0))
+        underline_var = tk.BooleanVar(value=layer.underline)
+        tk.Checkbutton(style_row, text="Subrayado", variable=underline_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_text_flag(layer, "underline")).pack(side=tk.LEFT, padx=(8, 0))
+
+        self._slider(card, token, "line_spacing", "Interlineado", 0.8, 2.5, disabled=disabled)
+        self._slider(card, token, "letter_spacing", "Espaciado entre letras", -0.05, 0.4,
+                     disabled=disabled)
+
+        stroke_var = tk.BooleanVar(value=layer.stroke_on)
+        tk.Checkbutton(card, text="Contorno", variable=stroke_var,
+                       bg=PANEL, fg=TEXT, selectcolor=FIELD, activebackground=PANEL,
+                       activeforeground=TEXT, font=("Segoe UI", 8), state=state,
+                       command=lambda: self._toggle_text_flag(layer, "stroke_on")).pack(anchor="w")
+        self._slider(card, token, "stroke_width", "Grosor del contorno", 0.0, 0.15,
+                     disabled=disabled or not layer.stroke_on)
+
+        self._slider(card, token, "rotation", "Rotación (grados)", -45.0, 45.0, disabled=disabled)
 
     def _format_value(self, value, as_percent):
         if as_percent:
@@ -813,6 +868,22 @@ class App(tk.Tk):
         from .commands import DictItemChangeCommand
         old_value = layer.overlay[key]
         self.commands.push(DictItemChangeCommand(layer.overlay, key, old_value, not old_value))
+        self._schedule_render()
+
+    def _toggle_text_flag(self, layer, attr):
+        if layer.locked:
+            return
+        from .commands import PropertyChangeCommand
+        old_value = getattr(layer, attr)
+        self.commands.push(PropertyChangeCommand(layer, attr, old_value, not old_value))
+        self._schedule_render()
+
+    def _on_font_family_change(self, layer, new_value):
+        old_value = layer.font_family
+        if old_value != new_value:
+            from .commands import PropertyChangeCommand
+            self.commands.push(PropertyChangeCommand(layer, "font_family", old_value, new_value))
+            self._build_property_panel()
         self._schedule_render()
 
     def _center_selected(self, axis):
@@ -1495,13 +1566,23 @@ class App(tk.Tk):
                         if es_activa and layer is self._layer_by_kind("title", slide) else layer.text)
                 layers.append({"type": "title", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
-                                "opacity": layer.opacity})
+                                "opacity": layer.opacity, "rotation": layer.rotation,
+                                "font_family": layer.font_family, "bold": layer.bold,
+                                "italic": layer.italic, "underline": layer.underline,
+                                "line_spacing": layer.line_spacing,
+                                "letter_spacing": layer.letter_spacing,
+                                "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width})
             elif layer.type == "text" and layer.role == "subtitle":
                 text = (self.v_sub.get()
                         if es_activa and layer is self._layer_by_kind("sub", slide) else layer.text)
                 layers.append({"type": "sub", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
-                                "opacity": layer.opacity})
+                                "opacity": layer.opacity, "rotation": layer.rotation,
+                                "font_family": layer.font_family, "bold": layer.bold,
+                                "italic": layer.italic, "underline": layer.underline,
+                                "line_spacing": layer.line_spacing,
+                                "letter_spacing": layer.letter_spacing,
+                                "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width})
             elif layer.type == "box":
                 es_desc_activa = es_activa and layer is self._layer_by_kind("desc", slide)
                 text = self.txt_desc.get("1.0", "end-1c") if es_desc_activa else layer.text
