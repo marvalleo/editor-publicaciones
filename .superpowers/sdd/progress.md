@@ -321,3 +321,8 @@ Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de
   import "LAYOUTS" sin uso en el bloque de botones (senalado tambien por el propio
   implementador en su reporte) -> corregido directamente por el orquestador (fix mecanico
   de una linea, sin ciclo completo de fix-subagent) en el commit 2729627.
+- Tarea 4 (verificacion headless de los 5 layouts): complete (commit 8c18195, review clean,
+  349 tests + HEADLESS_OK). 2 hallazgos Minor cosmeticos (dict "imagenes" sin lectura
+  posterior, doble iteracion de LAYOUTS en vez de recolectar bboxes en el primer loop) que
+  vienen del propio texto del plan, no del implementador -> no bloqueantes en un script de
+  verificacion manual, no ameritan ciclo de fix.
