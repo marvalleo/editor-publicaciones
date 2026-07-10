@@ -273,3 +273,4 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
   derecha" — cosmetico, no afecta la cobertura.
 - Tarea 3 (adaptadores app.py/_build_layers_for + exporter.py/_layers_from_slide): complete
   (commit 11609bb, review clean, 320 tests)
+- Tarea 4 (boton "+ Agregar texto" + _add_text_layer): complete (commit b5667b2, review clean, 321 tests)
