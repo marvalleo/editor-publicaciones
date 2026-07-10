@@ -34,20 +34,13 @@ class SlidesPanel(tk.Frame):
         tk.Label(self, text="🎞  Láminas", bg=self._bg, fg=self._text,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 2))
 
-        list_container = tk.Frame(self, bg=self._bg)
-        list_container.pack(fill=tk.X)
-        scroll_canvas = tk.Canvas(list_container, bg=self._bg, highlightthickness=0, height=260)
-        scrollbar = tk.Scrollbar(list_container, orient="vertical", command=scroll_canvas.yview)
-        self._rows_frame = tk.Frame(scroll_canvas, bg=self._bg)
-        rows_window = scroll_canvas.create_window((0, 0), window=self._rows_frame, anchor="nw")
-        self._rows_frame.bind(
-            "<Configure>",
-            lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all")))
-        scroll_canvas.bind(
-            "<Configure>", lambda e: scroll_canvas.itemconfig(rows_window, width=e.width))
-        scroll_canvas.configure(yscrollcommand=scrollbar.set)
-        scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Sin scroll propio: la lista crece con la cantidad de láminas y el
+        # scroll lo maneja el panel izquierdo que la contiene (evita tener
+        # dos scrolls anidados, uno de ellos con una barra angosta y sin
+        # soporte de rueda del mouse, que dejaba láminas inalcanzables en
+        # carruseles largos).
+        self._rows_frame = tk.Frame(self, bg=self._bg)
+        self._rows_frame.pack(fill=tk.X)
 
         actions = tk.Frame(self, bg=self._bg)
         actions.pack(fill=tk.X, pady=(4, 4))
