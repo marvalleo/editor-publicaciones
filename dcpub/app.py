@@ -1331,6 +1331,7 @@ class App(tk.Tk):
         comandos.append(PropertyChangeCommand(
             self.slide, "layout_tag", self.slide.layout_tag, layout_id))
         self.commands.push(CompositeCommand(comandos))
+        self._build_property_panel()
         self._render_now()
 
     def _reset(self):

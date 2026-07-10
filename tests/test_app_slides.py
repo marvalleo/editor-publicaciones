@@ -600,6 +600,7 @@ class TestApplyLayout(unittest.TestCase):
         from dcpub.commands import CommandStack
         self.app.commands = CommandStack()
         self.app._render_now = lambda: None
+        self.app._build_property_panel = lambda: None
 
     def test_repositions_title_of_active_slide(self):
         App._apply_layout(self.app, "B")
