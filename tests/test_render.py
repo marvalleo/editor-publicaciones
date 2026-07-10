@@ -662,5 +662,44 @@ class TestTitleRichText(unittest.TestCase):
         self.assertNotEqual(list(img_default.getdata()), list(img_lato.getdata()))
 
 
+class TestSubtitleRichText(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "sub", "key": "sub", "text": "Subtitulo de prueba",
+                "x": 0.5, "y": 0.55, "size": 0.05, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_defaults_still_produce_bbox(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        _, bboxes = compose([self._layer()], (1000, 1000), fm)
+        self.assertIn("sub", bboxes)
+
+    def test_bold_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(bold=False)], (1000, 1000), fm)
+        img_bold, _ = compose([self._layer(bold=True)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_bold.getdata()))
+
+    def test_font_family_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_default, _ = compose([self._layer(font_family="")], (1000, 1000), fm)
+        img_playfair, _ = compose([self._layer(font_family="playfair")], (1000, 1000), fm)
+        self.assertNotEqual(list(img_default.getdata()), list(img_playfair.getdata()))
+
+    def test_rotation_changes_pixels(self):
+        from dcpub.render import compose
+        fm = self._font_manager()
+        img_normal, _ = compose([self._layer(rotation=0.0)], (1000, 1000), fm)
+        img_rotated, _ = compose([self._layer(rotation=-15.0)], (1000, 1000), fm)
+        self.assertNotEqual(list(img_normal.getdata()), list(img_rotated.getdata()))
+
+
 if __name__ == "__main__":
     unittest.main()

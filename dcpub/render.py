@@ -544,38 +544,100 @@ def compose(layers, canvas_size, font_manager, palette=None):
             subtitle = layer["text"]
             if subtitle.strip():
                 ssz = max(8, int(W * layer["size"]))
-                font_s = font_manager.load("subtitle", ssz)
-                cx = int(layer["x"] * W)
-                sy = int(layer["y"] * H)
-                bb = draw.textbbox((0, 0), subtitle, font=font_s)
-                sw, sh = bb[2] - bb[0], bb[3] - bb[1]
-                sx = cx - sw // 2
-                ly = sy + sh // 2
-                lw_deco = max(2, int(W * 0.003))
-                line_len = int(W * 0.11)
-                gap = int(W * 0.03)
-                lx1 = max(0, sx - gap - line_len)
-                rx2 = min(W, sx + sw + gap + line_len)
-                line_color = _apply_opacity(VERDE, opacity)
-                deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                deco_draw = ImageDraw.Draw(deco_layer)
-                deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
-                deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
-                canvas = Image.alpha_composite(canvas, deco_layer)
-                draw = ImageDraw.Draw(canvas)
-                if opacity < 1.0:
-                    text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                    text_draw = ImageDraw.Draw(text_layer)
-                    text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
-                                   fill=_apply_opacity((0, 0, 0, 130), opacity))
-                    text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                    canvas = Image.alpha_composite(canvas, text_layer)
+                has_rich_text = any(layer.get(k) for k in ["font_family", "bold", "italic", "underline", "letter_spacing", "stroke_on", "rotation"])
+
+                if has_rich_text:
+                    # Nuevo pipeline de texto rico
+                    font_s = font_manager.load("subtitle", ssz, family=layer.get("font_family", ""))
+                    cx = int(layer["x"] * W)
+                    sy = int(layer["y"] * H)
+                    letter_spacing_px = int(ssz * layer.get("letter_spacing", 0))
+                    probe_draw = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+                    sw = _measure_line_width(probe_draw, subtitle, font_s, letter_spacing_px)
+                    bb = draw.textbbox((0, 0), subtitle, font=font_s)
+                    sh = bb[3] - bb[1]
+                    sx = cx - sw // 2
+                    ly = sy + sh // 2
+
+                    lw_deco = max(2, int(W * 0.003))
+                    line_len = int(W * 0.11)
+                    gap = int(W * 0.03)
+                    lx1 = max(0, sx - gap - line_len)
+                    rx2 = min(W, sx + sw + gap + line_len)
+                    line_color = _apply_opacity(VERDE, opacity)
+                    deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    deco_draw = ImageDraw.Draw(deco_layer)
+                    deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
+                    deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                    canvas = Image.alpha_composite(canvas, deco_layer)
                     draw = ImageDraw.Draw(canvas)
+
+                    bold = layer.get("bold", False)
+                    stroke_on = layer.get("stroke_on", False)
+                    border_px = int(ssz * layer.get("stroke_width", 0)) if stroke_on else 0
+                    bold_px = int(ssz * BOLD_STROKE_FRACTION) if bold else 0
+                    stroke_width_total = border_px + bold_px
+                    stroke_fill = (_apply_opacity(TEXT_STROKE_COLOR, opacity)
+                                   if stroke_on else line_color)
+
+                    block, pad = _render_text_lines_to_image(
+                        [subtitle], font_s, fill=line_color, line_height=sh,
+                        letter_spacing_px=letter_spacing_px,
+                        stroke_width=stroke_width_total, stroke_fill=stroke_fill,
+                        underline=layer.get("underline", False),
+                        shadow_offset=(2, 2),
+                        shadow_fill=_apply_opacity((0, 0, 0, 130), opacity), align="left")
+
+                    pre_w, pre_h = block.size
+                    center_x = (sx - pad) + pre_w / 2
+                    center_y = (sy - pad) + pre_h / 2
+
+                    if layer.get("italic", False):
+                        block = _apply_italic_shear(block)
+                    rotation = layer.get("rotation", 0.0)
+                    if rotation:
+                        block = _apply_rotation(block, rotation)
+
+                    paste_x = int(center_x - block.width / 2)
+                    paste_y = int(center_y - block.height / 2)
+                    canvas.alpha_composite(block, (paste_x, paste_y))
+                    draw = ImageDraw.Draw(canvas)
+
+                    bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
                 else:
-                    draw.text((sx + 2, sy + 2), subtitle, font=font_s,
-                              fill=_apply_opacity((0, 0, 0, 130), opacity))
-                    draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
-                bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
+                    # Legacy fast path: mantiene pixel-identical behavior cuando todos los campos de rich text están en default
+                    font_s = font_manager.load("subtitle", ssz)
+                    cx = int(layer["x"] * W)
+                    sy = int(layer["y"] * H)
+                    bb = draw.textbbox((0, 0), subtitle, font=font_s)
+                    sw, sh = bb[2] - bb[0], bb[3] - bb[1]
+                    sx = cx - sw // 2
+                    ly = sy + sh // 2
+                    lw_deco = max(2, int(W * 0.003))
+                    line_len = int(W * 0.11)
+                    gap = int(W * 0.03)
+                    lx1 = max(0, sx - gap - line_len)
+                    rx2 = min(W, sx + sw + gap + line_len)
+                    line_color = _apply_opacity(VERDE, opacity)
+                    deco_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                    deco_draw = ImageDraw.Draw(deco_layer)
+                    deco_draw.line([(lx1, ly), (sx - gap, ly)], fill=line_color, width=lw_deco)
+                    deco_draw.line([(sx + sw + gap, ly), (rx2, ly)], fill=line_color, width=lw_deco)
+                    canvas = Image.alpha_composite(canvas, deco_layer)
+                    draw = ImageDraw.Draw(canvas)
+                    if opacity < 1.0:
+                        text_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                        text_draw = ImageDraw.Draw(text_layer)
+                        text_draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                                       fill=_apply_opacity((0, 0, 0, 130), opacity))
+                        text_draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
+                        canvas = Image.alpha_composite(canvas, text_layer)
+                        draw = ImageDraw.Draw(canvas)
+                    else:
+                        draw.text((sx + 2, sy + 2), subtitle, font=font_s,
+                                  fill=_apply_opacity((0, 0, 0, 130), opacity))
+                        draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
+                    bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
         elif kind == "desc":
             description = layer["text"]
