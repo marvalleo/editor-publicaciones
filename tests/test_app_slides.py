@@ -318,6 +318,44 @@ class TestBuildLayersFor(unittest.TestCase):
         self.assertTrue(foto_capa["overlay"]["bottom_grad"])
         self.assertEqual(foto_capa["overlay"]["strength"], 0.7)
 
+    def test_build_layers_for_includes_title_rich_text_fields(self):
+        app = _make_app_with_two_slides()
+        title = App._layer_by_kind(app, "title", app.slide)
+        title.font_family = "lato"
+        title.bold = True
+        title.italic = True
+        title.underline = True
+        title.line_spacing = 1.4
+        title.letter_spacing = 0.05
+        title.stroke_on = True
+        title.stroke_width = 0.02
+        title.rotation = 15.0
+
+        capas = App._build_layers_for(app, app.slide)
+
+        title_capa = next(c for c in capas if c["type"] == "title")
+        self.assertEqual(title_capa["font_family"], "lato")
+        self.assertTrue(title_capa["bold"])
+        self.assertTrue(title_capa["italic"])
+        self.assertTrue(title_capa["underline"])
+        self.assertEqual(title_capa["line_spacing"], 1.4)
+        self.assertEqual(title_capa["letter_spacing"], 0.05)
+        self.assertTrue(title_capa["stroke_on"])
+        self.assertEqual(title_capa["stroke_width"], 0.02)
+        self.assertEqual(title_capa["rotation"], 15.0)
+
+    def test_build_layers_for_includes_subtitle_rich_text_fields(self):
+        app = _make_app_with_two_slides()
+        sub = App._layer_by_kind(app, "sub", app.slide)
+        sub.font_family = "playfair"
+        sub.rotation = -10.0
+
+        capas = App._build_layers_for(app, app.slide)
+
+        sub_capa = next(c for c in capas if c["type"] == "sub")
+        self.assertEqual(sub_capa["font_family"], "playfair")
+        self.assertEqual(sub_capa["rotation"], -10.0)
+
 
 class TestSharedLogo(unittest.TestCase):
     def setUp(self):

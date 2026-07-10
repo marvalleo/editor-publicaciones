@@ -154,5 +154,35 @@ class TestLayersFromSlideBoxAndCTA(unittest.TestCase):
         self.assertEqual(cta_capa["text"], "Reservá")
 
 
+class TestLayersFromSlideTitleSubtitleRichText(unittest.TestCase):
+    def test_title_includes_rich_text_fields(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto
+        slide = crear_slide_por_defecto("foto.jpg")
+        title = next(l for l in slide.layers if l.type == "text" and l.role == "title")
+        title.bold = True
+        title.rotation = 12.0
+
+        capas = _layers_from_slide(slide)
+
+        title_capa = next(c for c in capas if c["type"] == "title")
+        self.assertTrue(title_capa["bold"])
+        self.assertEqual(title_capa["rotation"], 12.0)
+
+    def test_subtitle_includes_rich_text_fields(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto
+        slide = crear_slide_por_defecto("foto.jpg")
+        sub = next(l for l in slide.layers if l.type == "text" and l.role == "subtitle")
+        sub.italic = True
+        sub.letter_spacing = 0.1
+
+        capas = _layers_from_slide(slide)
+
+        sub_capa = next(c for c in capas if c["type"] == "sub")
+        self.assertTrue(sub_capa["italic"])
+        self.assertEqual(sub_capa["letter_spacing"], 0.1)
+
+
 if __name__ == "__main__":
     unittest.main()

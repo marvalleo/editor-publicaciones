@@ -1495,13 +1495,23 @@ class App(tk.Tk):
                         if es_activa and layer is self._layer_by_kind("title", slide) else layer.text)
                 layers.append({"type": "title", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
-                                "opacity": layer.opacity})
+                                "opacity": layer.opacity, "rotation": layer.rotation,
+                                "font_family": layer.font_family, "bold": layer.bold,
+                                "italic": layer.italic, "underline": layer.underline,
+                                "line_spacing": layer.line_spacing,
+                                "letter_spacing": layer.letter_spacing,
+                                "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width})
             elif layer.type == "text" and layer.role == "subtitle":
                 text = (self.v_sub.get()
                         if es_activa and layer is self._layer_by_kind("sub", slide) else layer.text)
                 layers.append({"type": "sub", "key": layer.id, "text": text,
                                 "x": layer.x, "y": layer.y, "size": layer.size,
-                                "opacity": layer.opacity})
+                                "opacity": layer.opacity, "rotation": layer.rotation,
+                                "font_family": layer.font_family, "bold": layer.bold,
+                                "italic": layer.italic, "underline": layer.underline,
+                                "line_spacing": layer.line_spacing,
+                                "letter_spacing": layer.letter_spacing,
+                                "stroke_on": layer.stroke_on, "stroke_width": layer.stroke_width})
             elif layer.type == "box":
                 es_desc_activa = es_activa and layer is self._layer_by_kind("desc", slide)
                 text = self.txt_desc.get("1.0", "end-1c") if es_desc_activa else layer.text
