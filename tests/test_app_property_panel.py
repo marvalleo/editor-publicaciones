@@ -308,5 +308,39 @@ class TestFontFamilyChange(unittest.TestCase):
         self.assertEqual(len(self.app.commands._undo_stack), 0)
 
 
+class TestKindOfFreeText(unittest.TestCase):
+    def test_kind_of_free_text_layer_is_free(self):
+        from dcpub.models import TextLayer
+        app = App.__new__(App)
+
+        self.assertEqual(App._kind_of(app, TextLayer(role="free")), "free")
+
+
+class TestSizeRangeAndLabelsIncludeFreeText(unittest.TestCase):
+    def test_free_has_size_range(self):
+        from dcpub.app import SIZE_RANGE
+        self.assertIn("free", SIZE_RANGE)
+
+    def test_free_has_label(self):
+        from dcpub.app import LABELS
+        self.assertEqual(LABELS["free"], "Texto")
+
+
+class TestFreeTextCommit(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        from dcpub.models import TextLayer
+        self.app = App.__new__(App)
+        self.app.commands = CommandStack()
+        self.app._schedule_render = lambda: None
+        self.layer = TextLayer(role="free", text="Original")
+
+    def test_commit_changes_text_and_is_undoable(self):
+        App._on_cta_text_commit(self.app, self.layer, "Original", "Nuevo texto")
+        self.assertEqual(self.layer.text, "Nuevo texto")
+        self.app.commands.undo()
+        self.assertEqual(self.layer.text, "Original")
+
+
 if __name__ == "__main__":
     unittest.main()
