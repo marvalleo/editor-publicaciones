@@ -28,7 +28,7 @@ def _canvas_size(format_data: dict, max_side: int) -> tuple[int, int]:
     return w, h
 
 
-def _layers_from_slide(slide) -> list[dict]:
+def _layers_from_slide(slide, total_slides=1, active_index=0) -> list[dict]:
     layers = []
     for layer in slide.layers:
         if not layer.visible:
@@ -122,6 +122,31 @@ def _layers_from_slide(slide) -> list[dict]:
                 "text_color": layer.text_color,
                 "opacity": layer.opacity,
             })
+        elif layer.type == "line":
+            layers.append({
+                "type": "line",
+                "key": layer.id,
+                "x": layer.x,
+                "y": layer.y,
+                "length": layer.length,
+                "thickness": layer.thickness,
+                "color": layer.color,
+                "gap": layer.gap,
+                "rotation": layer.rotation,
+                "opacity": layer.opacity,
+            })
+        elif layer.type == "dots":
+            layers.append({
+                "type": "dots",
+                "key": layer.id,
+                "x": layer.x,
+                "y": layer.y,
+                "count": total_slides,
+                "active": active_index,
+                "color": layer.color,
+                "spacing": layer.spacing,
+                "opacity": layer.opacity,
+            })
     return layers
 
 
@@ -160,7 +185,7 @@ class Exporter:
             filename = f"{slug}_{index:0{total_digits}d}_{timestamp}.png"
             paths.append(
                 _export_layers(
-                    _layers_from_slide(slide),
+                    _layers_from_slide(slide, total_slides=len(project.slides), active_index=index - 1),
                     slide.format,
                     self.font_manager,
                     carpeta_destino,

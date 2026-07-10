@@ -639,6 +639,69 @@ def compose(layers, canvas_size, font_manager, palette=None):
                         draw.text((sx, sy), subtitle, font=font_s, fill=line_color)
                     bboxes[bbox_key] = (lx1, min(ly - lw_deco, sy), rx2, sy + sh + 6)
 
+        elif kind == "line":
+            cx = int(layer.get("x", 0.5) * W)
+            cy = int(layer.get("y", 0.5) * H)
+            length_px = max(1, int(W * layer.get("length", 0.22)))
+            thickness_px = max(1, int(W * layer.get("thickness", 0.003)))
+            gap_px = max(0, int(W * layer.get("gap", 0.0)))
+            line_color = _apply_opacity(layer.get("color", VERDE + (255,)), opacity)
+
+            line_w = length_px
+            line_h = thickness_px
+            if gap_px > 0:
+                line_w = max(length_px, gap_px + 2)
+            line_img = Image.new("RGBA", (line_w, line_h), (0, 0, 0, 0))
+            line_draw = ImageDraw.Draw(line_img)
+            y_mid = line_h // 2
+            if gap_px > 0:
+                left_end = max(0, (line_w - gap_px) // 2)
+                right_start = min(line_w, left_end + gap_px)
+                if left_end > 0:
+                    line_draw.line([(0, y_mid), (left_end, y_mid)], fill=line_color, width=thickness_px)
+                if right_start < line_w:
+                    line_draw.line([(right_start, y_mid), (line_w, y_mid)], fill=line_color, width=thickness_px)
+            else:
+                line_draw.line([(0, y_mid), (line_w, y_mid)], fill=line_color, width=thickness_px)
+
+            rotation = layer.get("rotation", 0.0)
+            rotated = _apply_rotation(line_img, rotation)
+            px = int(cx - rotated.width / 2)
+            py = int(cy - rotated.height / 2)
+            canvas.alpha_composite(rotated, (px, py))
+            draw = ImageDraw.Draw(canvas)
+            bboxes[bbox_key] = (px, py, px + rotated.width, py + rotated.height)
+
+        elif kind == "dots":
+            count = max(0, int(layer.get("count", 0)))
+            if count <= 0:
+                continue
+            active = int(layer.get("active", 0))
+            cx = int(layer.get("x", 0.5) * W)
+            cy = int(layer.get("y", 0.5) * H)
+            spacing_px = max(1, int(W * layer.get("spacing", 0.025)))
+            base_r = max(3, int(W * 0.035))
+            active_r = max(base_r + 2, int(W * 0.065))
+            total_w = spacing_px * (count - 1) + active_r * 2
+            total_h = active_r * 2
+            dots_layer = Image.new("RGBA", (total_w, total_h), (0, 0, 0, 0))
+            dots_draw = ImageDraw.Draw(dots_layer)
+            dot_color = _apply_opacity(layer.get("color", VERDE + (255,)), opacity)
+            start_x = active_r
+            center_y = total_h // 2
+            for i in range(count):
+                radius = active_r if i == active else base_r
+                dx = start_x + i * spacing_px
+                dots_draw.ellipse(
+                    [(dx - radius, center_y - radius), (dx + radius, center_y + radius)],
+                    fill=dot_color,
+                )
+            px = int(cx - total_w / 2)
+            py = int(cy - total_h / 2)
+            canvas.alpha_composite(dots_layer, (px, py))
+            draw = ImageDraw.Draw(canvas)
+            bboxes[bbox_key] = (px, py, px + total_w, py + total_h)
+
         elif kind == "desc":
             description = layer["text"]
             if description.strip():

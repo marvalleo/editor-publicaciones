@@ -483,6 +483,83 @@ class TestCTABox(unittest.TestCase):
         self.assertIn("cta", bboxes)
 
 
+class TestLineLayerRender(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "line", "key": "linea", "x": 0.5, "y": 0.5,
+                "length": 0.40, "thickness": 0.02,
+                "color": [255, 0, 0, 255], "gap": 0.0,
+                "rotation": 0.0, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_line_without_gap_draws_single_centered_segment(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer()], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertEqual(img.getpixel((50, 50)), (255, 0, 0, 255))
+        self.assertEqual(img.getpixel((29, 50)), (0, 0, 0, 0))
+        self.assertEqual(img.getpixel((71, 50)), (0, 0, 0, 0))
+
+    def test_line_with_gap_draws_two_segments_and_keeps_center_empty(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(gap=0.20)], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertEqual(img.getpixel((50, 50)), (0, 0, 0, 0))
+        self.assertEqual(img.getpixel((35, 50)), (255, 0, 0, 255))
+        self.assertEqual(img.getpixel((65, 50)), (255, 0, 0, 255))
+
+    def test_line_opacity_zero_keeps_bbox_but_draws_no_pixels(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(opacity=0.0)], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertIsNone(img.getbbox())
+
+    def test_line_rotation_changes_rendered_pixels(self):
+        from dcpub.render import compose
+        img_plain, _ = compose([self._layer(rotation=0.0)], (100, 100), self._font_manager())
+        img_rotated, _ = compose([self._layer(rotation=30.0)], (100, 100), self._font_manager())
+
+        self.assertNotEqual(list(img_plain.getdata()), list(img_rotated.getdata()))
+
+
+class TestDotsLayerRender(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "dots", "key": "puntos", "x": 0.5, "y": 0.5,
+                "count": 3, "active": 1, "color": [0, 255, 0, 255],
+                "spacing": 0.10, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_dots_draws_count_circles_and_active_is_larger(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer()], (100, 100), self._font_manager())
+
+        self.assertIn("puntos", bboxes)
+        self.assertEqual(img.getpixel((40, 50)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((50, 50)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((60, 50)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((50, 44)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((40, 44)), (0, 0, 0, 0))
+
+    def test_dots_opacity_zero_keeps_bbox_but_draws_no_pixels(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(opacity=0.0)], (100, 100), self._font_manager())
+
+        self.assertIn("puntos", bboxes)
+        self.assertIsNone(img.getbbox())
+
+
 class TestTrackedTextHelpers(unittest.TestCase):
     def _font(self):
         from dcpub.fonts import FontManager

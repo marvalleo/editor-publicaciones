@@ -154,6 +154,44 @@ class TestLayersFromSlideBoxAndCTA(unittest.TestCase):
         self.assertEqual(cta_capa["text"], "Reservá")
 
 
+    def test_line_layer_included(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto, LineLayer
+        slide = crear_slide_por_defecto("foto.jpg")
+        slide.layers.append(LineLayer(name="Línea", z=10, x=0.5, y=0.6,
+                                      length=0.33, thickness=0.006,
+                                      color=[10, 20, 30, 180], gap=0.05,
+                                      rotation=12.0, opacity=0.7))
+
+        capas = _layers_from_slide(slide)
+
+        line_capa = next(c for c in capas if c["type"] == "line")
+        self.assertEqual(line_capa["length"], 0.33)
+        self.assertEqual(line_capa["thickness"], 0.006)
+        self.assertEqual(line_capa["color"], [10, 20, 30, 180])
+        self.assertEqual(line_capa["gap"], 0.05)
+        self.assertEqual(line_capa["rotation"], 12.0)
+        self.assertEqual(line_capa["opacity"], 0.7)
+
+
+    def test_dots_layer_included_with_derived_count_and_active(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto, DotsLayer
+        slide = crear_slide_por_defecto("foto.jpg")
+        slide.layers.append(DotsLayer(name="Puntos", z=10, x=0.5, y=0.9,
+                                      color=[10, 20, 30, 180], spacing=0.04,
+                                      opacity=0.8))
+
+        capas = _layers_from_slide(slide, total_slides=4, active_index=2)
+
+        dots_capa = next(c for c in capas if c["type"] == "dots")
+        self.assertEqual(dots_capa["count"], 4)
+        self.assertEqual(dots_capa["active"], 2)
+        self.assertEqual(dots_capa["color"], [10, 20, 30, 180])
+        self.assertEqual(dots_capa["spacing"], 0.04)
+        self.assertEqual(dots_capa["opacity"], 0.8)
+
+
 class TestLayersFromSlideTitleSubtitleRichText(unittest.TestCase):
     def test_title_includes_rich_text_fields(self):
         from dcpub.exporter import _layers_from_slide

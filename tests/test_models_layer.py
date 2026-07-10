@@ -3,7 +3,8 @@
 import unittest
 
 from dcpub.models import (
-    Layer, PhotoLayer, LogoLayer, TextLayer, BoxLayer, CTALayer, layer_from_dict,
+    Layer, PhotoLayer, LogoLayer, TextLayer, BoxLayer, CTALayer, LineLayer, DotsLayer,
+    LAYER_CLASSES, layer_from_dict,
 )
 
 
@@ -73,6 +74,29 @@ class TestLayerSubclasses(unittest.TestCase):
         self.assertEqual(c.text, "")
         self.assertEqual(c.fill, list(BOX_COLOR))
         self.assertEqual(c.text_color, list(BLANCO) + [255])
+
+    def test_line_layer_defaults(self):
+        from dcpub.constants import VERDE
+        line = LineLayer()
+        self.assertEqual(line.type, "line")
+        self.assertEqual(line.length, 0.22)
+        self.assertEqual(line.thickness, 0.003)
+        self.assertEqual(line.color, list(VERDE) + [255])
+        self.assertEqual(line.gap, 0.0)
+
+    def test_layer_classes_registers_line(self):
+        self.assertIs(LAYER_CLASSES["line"], LineLayer)
+
+
+    def test_dots_layer_defaults(self):
+        from dcpub.constants import VERDE
+        dots = DotsLayer()
+        self.assertEqual(dots.type, "dots")
+        self.assertEqual(dots.color, list(VERDE) + [255])
+        self.assertEqual(dots.spacing, 0.025)
+
+    def test_layer_classes_registers_dots(self):
+        self.assertIs(LAYER_CLASSES["dots"], DotsLayer)
 
     def test_to_dict_includes_all_fields(self):
         t = TextLayer(text="Hola", role="title")
