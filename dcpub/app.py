@@ -264,7 +264,6 @@ class App(tk.Tk):
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(6, 2), **pad)
         row_layout = tk.Frame(left, bg=PANEL)
         row_layout.pack(fill=tk.X, pady=(2, 10), **pad)
-        from .presets.layouts import LAYOUTS
         for layout_id in ("A", "B", "C", "D", "E"):
             tk.Button(row_layout, text=layout_id, bg="#3d3d3d", fg=TEXT, relief="flat",
                       font=("Segoe UI", 9, "bold"), width=3,
