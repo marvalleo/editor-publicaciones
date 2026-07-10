@@ -5,6 +5,7 @@ from pathlib import Path
 VERDE = (141, 194, 111)       # verde lima de la marca (#8DC26F)
 BLANCO = (255, 255, 255)
 BOX_COLOR = (40, 25, 15, 215)  # recuadro inferior marrón oscuro semitransparente
+TEXT_STROKE_COLOR = (20, 12, 8, 255)  # contorno de texto, fijo (no configurable)
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 SCRIPT_DIR = PACKAGE_DIR.parent
@@ -25,6 +26,12 @@ FALLBACK_FONTS = {
     "title":    ["georgiab.ttf", "Georgia Bold.ttf", "DejaVuSerif-Bold.ttf", "LiberationSerif-Bold.ttf"],
     "subtitle": ["segoesc.ttf",  "Brush Script MT.ttf", "Comic Sans MS.ttf", "DejaVuSerif-Italic.ttf"],
     "body":     ["calibri.ttf",  "Helvetica.ttf", "Arial.ttf", "DejaVuSans.ttf"],
+}
+
+FAMILY_FONT_FILES = {
+    "playfair": "PlayfairDisplay-Bold.ttf",
+    "dancing": "DancingScript-Regular.ttf",
+    "lato": "Lato-Regular.ttf",
 }
 
 SYSTEM_FONT_DIRS = [

@@ -4,7 +4,7 @@ import urllib.request
 
 from PIL import ImageFont
 
-from .constants import FONTS_DIR, FONT_URLS, FALLBACK_FONTS, SYSTEM_FONT_DIRS
+from .constants import FONTS_DIR, FONT_URLS, FALLBACK_FONTS, SYSTEM_FONT_DIRS, FAMILY_FONT_FILES
 
 
 def find_system_font(candidates):
@@ -28,14 +28,20 @@ class FontManager:
     def __init__(self):
         self._cache = {}
 
-    def load(self, role, size):
-        """Carga la fuente del rol (title / subtitle / body) con cache."""
+    def load(self, role, size, family=""):
+        """Carga la fuente del rol (title / subtitle / body) con cache. Si
+        `family` viene vacío, usa la fuente de marca del rol (legado). Si
+        viene seteado ("playfair"/"dancing"/"lato"), usa ese archivo de
+        fuente en vez del preferido por rol, cayendo al mismo fallback de
+        sistema del rol si el archivo no está disponible."""
         size = max(6, int(size))
-        key = (role, size)
+        key = (role, size, family)
         if key in self._cache:
             return self._cache[key]
 
         preferred, fallbacks = self._ROLE_MAP[role]
+        if family:
+            preferred = FAMILY_FONT_FILES.get(family, preferred)
 
         font = None
         p = FONTS_DIR / preferred
