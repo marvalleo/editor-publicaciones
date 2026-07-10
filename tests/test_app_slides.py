@@ -1,7 +1,12 @@
 """Tests de estado de lámina activa en dcpub.app.App (sin abrir Tk)."""
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+from PIL import Image
 
 from dcpub.app import App
 from dcpub.models import crear_proyecto_por_defecto
@@ -838,3 +843,124 @@ class TestGeometricLayerReadout(unittest.TestCase):
         App._update_readout(app)
 
         self.assertIn("Separación: 0.040", app.v_readout.value)
+
+
+class TestImportBatch(unittest.TestCase):
+    def setUp(self):
+        from dcpub.commands import CommandStack
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.carpeta = Path(self._tmpdir.name)
+
+        self.app = App.__new__(App)
+        self.app.project = crear_proyecto_por_defecto("foto_original.jpg")
+        self.app.slide = self.app.project.slides[0]
+        self.app.current_slide_index = 0
+        self.app.commands = CommandStack()
+        self.app._project_path = Path("original.json")
+        self.app._selected = None
+        self.app.v_logo_shared = _FakeVar(False)
+        self.app.v_status = _FakeVar("")
+        self.app._confirm_discard_changes = lambda: True
+        self.app._sync_widgets_from_slide = lambda: None
+        self.app._set_dirty = lambda value: None
+        self.app._build_property_panel = lambda: None
+        self.app._refresh_layers_list = lambda: None
+        self.app._schedule_render = lambda: None
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _crear_lote(self, entradas, imagenes=("01.jpg", "02.jpg")):
+        for nombre in imagenes:
+            Image.new("RGB", (320, 240), (120, 140, 90)).save(self.carpeta / nombre)
+        (self.carpeta / "copys.json").write_text(json.dumps(entradas), encoding="utf-8")
+
+    def test_import_replaces_project_with_multi_slide_carousel(self):
+        self._crear_lote([
+            {"imagen": "01.jpg", "titulo": "Lámina uno", "subtitulo": "Sub 1"},
+            {"imagen": "02.jpg", "titulo": "Lámina dos", "subtitulo": "Sub 2"},
+        ])
+
+        with patch("dcpub.app.filedialog.askdirectory", return_value=str(self.carpeta)):
+            App._import_batch(self.app)
+
+        self.assertEqual(len(self.app.project.slides), 2)
+        self.assertIs(self.app.slide, self.app.project.slides[0])
+        self.assertEqual(self.app.current_slide_index, 0)
+        self.assertIsNone(self.app._project_path)
+
+    def test_import_cancelled_dialog_leaves_project_untouched(self):
+        proyecto_original = self.app.project
+
+        with patch("dcpub.app.filedialog.askdirectory", return_value=""):
+            App._import_batch(self.app)
+
+        self.assertIs(self.app.project, proyecto_original)
+
+    def test_import_respects_discard_confirmation(self):
+        self.app._confirm_discard_changes = lambda: False
+        proyecto_original = self.app.project
+
+        with patch("dcpub.app.filedialog.askdirectory", return_value=str(self.carpeta)):
+            App._import_batch(self.app)
+
+        self.assertIs(self.app.project, proyecto_original)
+
+    def test_import_with_unmatched_image_shows_warning_but_still_imports(self):
+        self._crear_lote(
+            [{"imagen": "01.jpg", "titulo": "Lámina uno"}],
+            imagenes=("01.jpg", "02.jpg"),
+        )
+
+        with patch("dcpub.app.filedialog.askdirectory", return_value=str(self.carpeta)), \
+             patch("dcpub.app.messagebox.showwarning") as mock_warn:
+            App._import_batch(self.app)
+
+        self.assertEqual(len(self.app.project.slides), 1)
+        mock_warn.assert_called_once()
+
+    def test_import_with_no_matches_shows_error_and_keeps_project(self):
+        (self.carpeta / "copys.json").write_text(json.dumps([]), encoding="utf-8")
+        proyecto_original = self.app.project
+
+        with patch("dcpub.app.filedialog.askdirectory", return_value=str(self.carpeta)), \
+             patch("dcpub.app.messagebox.showerror") as mock_error:
+            App._import_batch(self.app)
+
+        self.assertIs(self.app.project, proyecto_original)
+        mock_error.assert_called_once()
+
+
+class TestExportAll(unittest.TestCase):
+    def setUp(self):
+        from dcpub.fonts import FontManager
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self._tmpdir.name)
+
+        foto1 = self.tmp_path / "foto1.jpg"
+        foto2 = self.tmp_path / "foto2.jpg"
+        Image.new("RGB", (320, 240), (120, 140, 90)).save(foto1)
+        Image.new("RGB", (320, 240), (80, 100, 140)).save(foto2)
+
+        self.app = App.__new__(App)
+        self.app.project = crear_proyecto_por_defecto(str(foto1))
+        segunda = crear_proyecto_por_defecto(str(foto2)).slides[0]
+        self.app.project.slides.append(segunda)
+        self.app.slide = self.app.project.slides[0]
+        self.app.font_manager = FontManager()
+        self.app.v_export_dir = _FakeVar(str(self.tmp_path / "salida"))
+        self.app.v_status = _FakeVar("")
+        self.app._sync_text_to_layers = lambda: None
+        self.app.update = lambda: None
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_export_all_creates_one_file_per_slide(self):
+        with patch("dcpub.app.messagebox.showinfo") as mock_info:
+            App._export_all(self.app)
+
+        dest = self.tmp_path / "salida"
+        exported = list(dest.glob("*.png"))
+        self.assertEqual(len(exported), 2)
+        mock_info.assert_called_once()

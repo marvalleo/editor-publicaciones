@@ -352,6 +352,10 @@ class App(tk.Tk):
                   font=("Segoe UI", 9), command=self._save_project).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=(3, 0))
 
+        tk.Button(left, text="🗂  Importar carrusel por lotes…", bg="#3d3d3d", fg=TEXT,
+                  relief="flat", font=("Segoe UI", 9),
+                  command=self._import_batch).pack(fill=tk.X, pady=(0, 6), **pad)
+
         # Botones
         tk.Button(left, text="👁  Vista previa", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 10), pady=8, command=self._render_now).pack(
@@ -371,7 +375,10 @@ class App(tk.Tk):
 
         tk.Button(left, text="📤  Exportar", bg=ACCENT, fg="white", relief="flat",
                   font=("Segoe UI", 11, "bold"), pady=9, command=self._export).pack(
-            fill=tk.X, pady=(4, 6), **pad)
+            fill=tk.X, pady=(4, 4), **pad)
+        tk.Button(left, text="📤  Exportar todas las láminas", bg="#3d3d3d", fg=TEXT,
+                  relief="flat", font=("Segoe UI", 9),
+                  command=self._export_all).pack(fill=tk.X, pady=(0, 6), **pad)
 
         # Panel de miniaturas de láminas: se instancia al final (después de
         # txt_title/txt_desc, de los que depende _build_layers_for para
@@ -2041,6 +2048,50 @@ class App(tk.Tk):
         self._schedule_render()
         self.v_status.set(f"✅ Proyecto abierto: {self._project_path.name}")
 
+    def _import_batch(self):
+        """Reemplaza el proyecto actual por un carrusel armado desde una
+        carpeta con fotos + un único JSON de copys (dcpub.batch_import)."""
+        if not self._confirm_discard_changes():
+            return
+        carpeta_str = filedialog.askdirectory(
+            title="Elegir carpeta con fotos y JSON de copys", initialdir=str(SCRIPT_DIR))
+        if not carpeta_str:
+            return
+
+        from .batch_import import importar_carrusel_por_lotes
+        try:
+            project, advertencias = importar_carrusel_por_lotes(
+                Path(carpeta_str), dict(self.slide.format))
+        except Exception as e:
+            messagebox.showerror("Error al importar", str(e))
+            return
+        if not project.slides:
+            messagebox.showerror(
+                "Error al importar",
+                "No se encontró ninguna foto con entrada correspondiente en el JSON.")
+            return
+
+        self.project = project
+        self.slide = self.project.slides[0]
+        self.current_slide_index = 0
+        self._project_path = None
+        self.commands.clear()
+        self._selected = None
+
+        self.v_logo_shared.set("logo" in self.project.shared)
+        self._sync_widgets_from_slide()
+
+        self._set_dirty(True)
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+        self.v_status.set(f"✅ Importadas {len(project.slides)} láminas.")
+
+        if advertencias:
+            messagebox.showwarning(
+                "Importado con advertencias",
+                f"{len(advertencias)} advertencia(s):\n\n" + "\n".join(advertencias))
+
     def _on_close(self):
         if self._confirm_discard_changes():
             self.destroy()
@@ -2075,3 +2126,18 @@ class App(tk.Tk):
         except Exception as e:
             self.v_status.set(f"Error: {e}")
             messagebox.showerror("Error al exportar", str(e))
+
+    def _export_all(self):
+        self._sync_text_to_layers()
+        dest_dir = Path(self.v_export_dir.get() or OUTPUT_DIR)
+        self.v_status.set("Exportando todas las láminas…")
+        self.update()
+        try:
+            from .exporter import Exporter
+            exporter = Exporter(self.font_manager)
+            paths = exporter.exportar_todas(self.project, dest_dir)
+            self.v_status.set(f"✅  {len(paths)} láminas exportadas en {dest_dir}")
+            messagebox.showinfo("¡Listo!", f"{len(paths)} láminas exportadas en:\n{dest_dir}")
+        except Exception as e:
+            self.v_status.set(f"Error: {e}")
+            messagebox.showerror("Error al exportar todas", str(e))
