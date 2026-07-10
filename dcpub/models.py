@@ -86,6 +86,14 @@ class TextLayer(Layer):
     text: str = ""
     role: str = "free"
     size: float = 0.05
+    font_family: str = ""
+    bold: bool = False
+    italic: bool = False
+    underline: bool = False
+    line_spacing: float = 0.0
+    letter_spacing: float = 0.0
+    stroke_on: bool = False
+    stroke_width: float = 0.0
 
 
 @dataclass
@@ -226,8 +234,12 @@ LAYER_STYLE_FIELDS = {
     ("photo", None): ("x", "y", "w", "h", "rotation", "opacity",
                        "fit", "zoom", "offset_x", "offset_y", "adjust", "overlay"),
     ("logo", None): ("x", "y", "w", "h", "rotation", "opacity", "keep_ratio"),
-    ("text", "title"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
-    ("text", "subtitle"): ("x", "y", "w", "h", "rotation", "opacity", "size"),
+    ("text", "title"): ("x", "y", "w", "h", "rotation", "opacity", "size",
+                        "font_family", "bold", "italic", "underline",
+                        "line_spacing", "letter_spacing", "stroke_on", "stroke_width"),
+    ("text", "subtitle"): ("x", "y", "w", "h", "rotation", "opacity", "size",
+                           "font_family", "bold", "italic", "underline",
+                           "line_spacing", "letter_spacing", "stroke_on", "stroke_width"),
     ("box", None): ("x", "y", "w", "h", "rotation", "opacity", "size", "icon",
                      "fill", "text_color"),
     ("cta", None): ("x", "y", "w", "h", "rotation", "opacity", "size",

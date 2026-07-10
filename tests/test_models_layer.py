@@ -44,6 +44,17 @@ class TestLayerSubclasses(unittest.TestCase):
         self.assertEqual(t.role, "title")
         self.assertEqual(t.size, 0.08)
 
+    def test_text_layer_rich_text_defaults(self):
+        t = TextLayer(text="Hola", role="title")
+        self.assertEqual(t.font_family, "")
+        self.assertFalse(t.bold)
+        self.assertFalse(t.italic)
+        self.assertFalse(t.underline)
+        self.assertEqual(t.line_spacing, 0.0)
+        self.assertEqual(t.letter_spacing, 0.0)
+        self.assertFalse(t.stroke_on)
+        self.assertEqual(t.stroke_width, 0.0)
+
     def test_box_layer_defaults(self):
         b = BoxLayer(text="desc", icon="planta", size=0.03)
         self.assertEqual(b.type, "box")
@@ -99,7 +110,9 @@ class TestLayerFromDict(unittest.TestCase):
         layers = [
             PhotoLayer(src="a.jpg"),
             LogoLayer(src="logo.png"),
-            TextLayer(text="T", role="subtitle"),
+            TextLayer(text="T", role="subtitle", font_family="lato", bold=True,
+                      italic=True, underline=True, line_spacing=1.4,
+                      letter_spacing=0.05, stroke_on=True, stroke_width=0.02),
             BoxLayer(text="D", icon="corazón", fill=[1, 2, 3, 100],
                      text_color=[4, 5, 6, 200]),
             CTALayer(text="Reservá ahora", fill=[9, 9, 9, 200]),
