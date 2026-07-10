@@ -186,4 +186,25 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-texto-rico.md
   cuando el valor no cambia (codigo verbatim del brief), desperdicia un render de mas en un no-op.
 - Tarea 9 (verificacion headless de cierre): complete, HEADLESS_OK (282 tests)
 
-Veredicto: pendiente de revision final de rama completa.
+# Revision final de rama completa (Fase 4 sub-fase 2: texto rico)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Confirmado end-to-end el
+encadenamiento de campos font_family/bold/stroke_width desde TextLayer (Tarea 1) pasando por los
+adaptadores app.py/exporter.py (Tarea 7) hasta compose() (Tareas 5/6) con nombres de clave
+consistentes; preview y export coinciden exactamente en los mismos 9 campos. Gates has_rich_text
+de title y sub verificados completos (stroke_width es inerte sin stroke_on, que si esta gateado;
+sub omite line_spacing legitimamente por ser una sola linea). Proyectos legado cargan bien via
+defaults del dataclass. Geometria/pad de _render_text_lines_to_image confirmada suficiente para
+que stroke/bold no se corten en los bordes.
+
+5 hallazgos Minor no bloqueantes: (1) default de line_spacing=0.0 queda fuera del rango del
+slider (0.8-2.5), cosmetico; (2) togglear "Contorno" no refresca el estado disabled del slider de
+grosor hasta reabrir el panel; (3) checkboxes/combobox no reflejan undo/redo hasta reconstruir el
+panel (patron preexistente, no regresion); (4) ~40-80 lineas duplicadas de dibujo legado en
+title/sub bajo el gate has_rich_text quedan como candidato a extraccion en Fase 6 (decision
+dual-path ya aprobada por el usuario, no se re-litiga); (5) _on_font_family_change dispara un
+render de mas en no-op (ya registrado en Tarea 8).
+
+Suite final: 282 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge a main.
