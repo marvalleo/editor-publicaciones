@@ -1,5 +1,7 @@
 """Paletas de marca disponibles para proyectos dcpub."""
 
+from ..constants import BLANCO, BOX_COLOR, VERDE
+
 
 PALETA_PRINCIPAL = {
     "id": "principal",
@@ -16,9 +18,9 @@ PALETA_PRINCIPAL = {
 PALETA_LEGACY = {
     "id": "legacy",
     "nombre": "Alternativo legacy",
-    "verde": [141, 194, 111],      # v2.0 verde lima #8DC26F
-    "blanco": [255, 255, 255],     # v2.0 white (puro)
-    "box": [40, 25, 15, 215],      # v2.0 recuadro
+    "verde": list(VERDE),
+    "blanco": list(BLANCO),
+    "box": list(BOX_COLOR),
 }
 
 

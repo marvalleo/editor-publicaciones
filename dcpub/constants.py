@@ -3,7 +3,7 @@
 from pathlib import Path
 
 VERDE = (141, 194, 111)       # verde lima de la marca (#8DC26F)
-BLANCO = (247, 241, 232)      # blanco crema de la marca (#F7F1E8)
+BLANCO = (255, 255, 255)
 BOX_COLOR = (40, 25, 15, 215)  # recuadro inferior marrón oscuro semitransparente
 TEXT_STROKE_COLOR = (20, 12, 8, 255)  # contorno de texto, fijo (no configurable)
 

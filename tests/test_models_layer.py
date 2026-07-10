@@ -58,7 +58,7 @@ class TestLayerSubclasses(unittest.TestCase):
 
     def test_text_layer_free_block_has_configurable_color(self):
         t = TextLayer(text="Hola", role="free")
-        self.assertEqual(t.color, [247, 241, 232, 255])
+        self.assertEqual(t.color, [255, 255, 255, 255])
 
     def test_box_layer_defaults(self):
         b = BoxLayer(text="desc", icon="planta", size=0.03)
