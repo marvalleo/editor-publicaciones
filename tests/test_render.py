@@ -483,5 +483,82 @@ class TestCTABox(unittest.TestCase):
         self.assertIn("cta", bboxes)
 
 
+class TestTrackedTextHelpers(unittest.TestCase):
+    def _font(self):
+        from dcpub.fonts import FontManager
+        return FontManager().load("body", 40)
+
+    def test_measure_line_width_no_spacing_matches_textbbox(self):
+        from dcpub.render import _measure_line_width
+        font = self._font()
+        img = Image.new("RGBA", (1, 1))
+        draw_ctx = ImageDraw.Draw(img)
+        bb = draw_ctx.textbbox((0, 0), "Hola", font=font)
+        expected = bb[2] - bb[0]
+        self.assertEqual(_measure_line_width(draw_ctx, "Hola", font, 0), expected)
+
+    def test_measure_line_width_grows_with_positive_spacing(self):
+        from dcpub.render import _measure_line_width
+        font = self._font()
+        img = Image.new("RGBA", (1, 1))
+        draw_ctx = ImageDraw.Draw(img)
+        w_no_spacing = _measure_line_width(draw_ctx, "Hola", font, 0)
+        w_with_spacing = _measure_line_width(draw_ctx, "Hola", font, 10)
+        self.assertGreater(w_with_spacing, w_no_spacing)
+
+    def test_draw_tracked_line_with_spacing_produces_wider_pixels_than_without(self):
+        from dcpub.render import _draw_tracked_line
+        font = self._font()
+
+        img_tight = Image.new("RGBA", (400, 80), (0, 0, 0, 0))
+        _draw_tracked_line(ImageDraw.Draw(img_tight), (10, 10), "Hola",
+                            font, (255, 255, 255, 255), 0)
+
+        img_spaced = Image.new("RGBA", (400, 80), (0, 0, 0, 0))
+        _draw_tracked_line(ImageDraw.Draw(img_spaced), (10, 10), "Hola",
+                            font, (255, 255, 255, 255), 15)
+
+        bbox_tight = img_tight.getbbox()
+        bbox_spaced = img_spaced.getbbox()
+        self.assertGreater(bbox_spaced[2] - bbox_spaced[0], bbox_tight[2] - bbox_tight[0])
+
+    def test_render_text_lines_to_image_produces_nonempty_image(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img, pad = _render_text_lines_to_image(
+            ["Hola mundo"], font, fill=(255, 255, 255, 255), line_height=48)
+        self.assertIsNotNone(img.getbbox())
+        self.assertGreaterEqual(pad, 0)
+
+    def test_render_text_lines_to_image_underline_adds_pixels_below_text(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_plain, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48, underline=False)
+        img_underline, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48, underline=True)
+        self.assertNotEqual(list(img_plain.getdata()), list(img_underline.getdata()))
+
+    def test_render_text_lines_to_image_shadow_adds_pixels(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_no_shadow, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48)
+        img_shadow, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48,
+            shadow_offset=(3, 3), shadow_fill=(0, 0, 0, 160))
+        self.assertNotEqual(list(img_no_shadow.getdata()), list(img_shadow.getdata()))
+
+    def test_render_text_lines_to_image_stroke_changes_pixels(self):
+        from dcpub.render import _render_text_lines_to_image
+        font = self._font()
+        img_no_stroke, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48)
+        img_stroke, _ = _render_text_lines_to_image(
+            ["Hola"], font, fill=(255, 255, 255, 255), line_height=48,
+            stroke_width=4, stroke_fill=(20, 12, 8, 255))
+        self.assertNotEqual(list(img_no_stroke.getdata()), list(img_stroke.getdata()))
+
+
 if __name__ == "__main__":
     unittest.main()

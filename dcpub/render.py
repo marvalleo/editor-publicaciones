@@ -288,6 +288,77 @@ def _get_background(photo_path, canvas_size, zoom=1.0, offset_x=0.5, offset_y=0.
     return photo.copy()
 
 
+BOLD_STROKE_FRACTION = 0.06  # grosor sintetico extra cuando bold=True, fraccion del tamaño de fuente
+
+
+def _measure_line_width(draw_ctx, text, font, letter_spacing_px):
+    """Ancho en px de `text` con `font`, sumando `letter_spacing_px` entre
+    cada caracter. Con letter_spacing_px=0 equivale a textbbox normal."""
+    if letter_spacing_px == 0:
+        bbox = draw_ctx.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0]
+    total = 0
+    for ch in text:
+        bbox = draw_ctx.textbbox((0, 0), ch, font=font)
+        total += (bbox[2] - bbox[0]) + letter_spacing_px
+    return max(0, total - letter_spacing_px)
+
+
+def _draw_tracked_line(draw_ctx, xy, text, font, fill, letter_spacing_px,
+                        stroke_width=0, stroke_fill=None):
+    """Dibuja `text` en `xy` con tracking manual si letter_spacing_px != 0
+    (caracter por caracter); si es 0, usa draw.text normal (camino rapido,
+    sin cambio de comportamiento respecto al codigo legado)."""
+    if letter_spacing_px == 0:
+        draw_ctx.text(xy, text, font=font, fill=fill,
+                       stroke_width=stroke_width, stroke_fill=stroke_fill)
+        return
+    x, y = xy
+    for ch in text:
+        draw_ctx.text((x, y), ch, font=font, fill=fill,
+                       stroke_width=stroke_width, stroke_fill=stroke_fill)
+        bbox = draw_ctx.textbbox((0, 0), ch, font=font)
+        x += (bbox[2] - bbox[0]) + letter_spacing_px
+
+
+def _render_text_lines_to_image(lines, font, *, fill, line_height,
+                                 letter_spacing_px=0, stroke_width=0,
+                                 stroke_fill=None, underline=False,
+                                 shadow_offset=None, shadow_fill=None,
+                                 align="left"):
+    """Renderiza `lines` (lista de strings, una por linea) a una imagen RGBA
+    ajustada al contenido, con tracking/stroke/subrayado/sombra ya
+    horneados. No aplica italica ni rotacion (eso se hace despues, sobre la
+    imagen devuelta). Devuelve (imagen, pad), donde `pad` es el margen
+    interno agregado a cada lado (necesario para que el stroke no se corte
+    en los bordes) — quien llama debe restar `pad` de la posicion de anclaje
+    original al pegar la imagen resultante en el lienzo."""
+    probe = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
+    probe_draw = ImageDraw.Draw(probe)
+    widths = [_measure_line_width(probe_draw, line, font, letter_spacing_px)
+              for line in lines]
+    block_w = max(widths, default=0)
+    pad = max(4, stroke_width * 2 + 4)
+    block_h = max(1, len(lines)) * line_height
+
+    img = Image.new("RGBA", (block_w + pad * 2, block_h + pad * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for i, (line, lw) in enumerate(zip(lines, widths)):
+        ly = pad + i * line_height
+        lx = pad if align == "left" else pad + (block_w - lw) // 2
+        if shadow_offset:
+            dx, dy = shadow_offset
+            _draw_tracked_line(d, (lx + dx, ly + dy), line, font,
+                                shadow_fill, letter_spacing_px)
+        _draw_tracked_line(d, (lx, ly), line, font, fill, letter_spacing_px,
+                            stroke_width=stroke_width, stroke_fill=stroke_fill)
+        if underline:
+            uy = ly + line_height - max(1, int(line_height * 0.08))
+            d.line([(lx, uy), (lx + lw, uy)], fill=fill,
+                   width=max(1, int(line_height * 0.05)))
+    return img, pad
+
+
 def compose(layers, canvas_size, font_manager, palette=None):
     """
     Compone la publicación a partir de una lista de capas.
