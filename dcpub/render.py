@@ -359,6 +359,24 @@ def _render_text_lines_to_image(lines, font, *, fill, line_height,
     return img, pad
 
 
+def _apply_italic_shear(img, factor=0.22):
+    """Inclina `img` horizontalmente (shear) para simular itálica. `factor`
+    es la pendiente del corte (positivo = inclina hacia la derecha arriba)."""
+    w, h = img.size
+    xshift = int(round(abs(factor) * h))
+    new_w = w + xshift
+    coeffs = (1, factor, -xshift if factor > 0 else 0, 0, 1, 0)
+    return img.transform((new_w, h), Image.AFFINE, coeffs, resample=Image.BICUBIC)
+
+
+def _apply_rotation(img, degrees):
+    """Rota `img` `degrees` grados (sentido horario positivo), expandiendo
+    el lienzo para no recortar contenido. Sin cambios si degrees es 0."""
+    if not degrees:
+        return img
+    return img.rotate(-degrees, expand=True, resample=Image.BICUBIC)
+
+
 def compose(layers, canvas_size, font_manager, palette=None):
     """
     Compone la publicación a partir de una lista de capas.

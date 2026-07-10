@@ -560,5 +560,38 @@ class TestTrackedTextHelpers(unittest.TestCase):
         self.assertNotEqual(list(img_no_stroke.getdata()), list(img_stroke.getdata()))
 
 
+class TestItalicAndRotationHelpers(unittest.TestCase):
+    def _sample_image(self):
+        img = Image.new("RGBA", (100, 40), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rectangle([(10, 10), (90, 30)], fill=(255, 255, 255, 255))
+        return img
+
+    def test_italic_shear_widens_image(self):
+        from dcpub.render import _apply_italic_shear
+        img = self._sample_image()
+        sheared = _apply_italic_shear(img)
+        self.assertGreater(sheared.width, img.width)
+        self.assertEqual(sheared.height, img.height)
+
+    def test_italic_shear_preserves_content(self):
+        from dcpub.render import _apply_italic_shear
+        img = self._sample_image()
+        sheared = _apply_italic_shear(img)
+        self.assertIsNotNone(sheared.getbbox())
+
+    def test_rotation_zero_returns_same_image(self):
+        from dcpub.render import _apply_rotation
+        img = self._sample_image()
+        rotated = _apply_rotation(img, 0)
+        self.assertEqual(rotated.size, img.size)
+
+    def test_rotation_nonzero_expands_canvas(self):
+        from dcpub.render import _apply_rotation
+        img = self._sample_image()
+        rotated = _apply_rotation(img, 30)
+        self.assertGreater(rotated.width, img.width)
+
+
 if __name__ == "__main__":
     unittest.main()
