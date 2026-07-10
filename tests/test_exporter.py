@@ -222,5 +222,22 @@ class TestLayersFromSlideTitleSubtitleRichText(unittest.TestCase):
         self.assertEqual(sub_capa["letter_spacing"], 0.1)
 
 
+class TestLayersFromSlideFreeText(unittest.TestCase):
+    def test_free_text_block_included_with_color(self):
+        from dcpub.exporter import _layers_from_slide
+        from dcpub.models import crear_slide_por_defecto, TextLayer
+        slide = crear_slide_por_defecto("foto.jpg")
+        libre = TextLayer(name="Texto libre", role="free", text="Extra",
+                          color=[9, 8, 7, 180], italic=True)
+        slide.layers.append(libre)
+
+        capas = _layers_from_slide(slide)
+
+        libre_capa = next(c for c in capas if c["type"] == "free")
+        self.assertEqual(libre_capa["text"], "Extra")
+        self.assertEqual(libre_capa["color"], [9, 8, 7, 180])
+        self.assertTrue(libre_capa["italic"])
+
+
 if __name__ == "__main__":
     unittest.main()

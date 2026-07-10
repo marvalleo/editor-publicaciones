@@ -691,6 +691,25 @@ class TestBuildLayersForDotsLayer(unittest.TestCase):
         self.assertEqual(dots_dict["active"], 1)
 
 
+class TestBuildLayersForFreeText(unittest.TestCase):
+    def test_build_layers_for_includes_free_text_block(self):
+        from dcpub.models import TextLayer
+        app = _make_app_with_two_slides()
+        libre = TextLayer(name="Texto libre", role="free", text="Hola mundo",
+                          x=0.2, y=0.6, size=0.04, color=[1, 2, 3, 200],
+                          font_family="lato", bold=True, rotation=7.0)
+        app.slide.layers.append(libre)
+
+        layers = App._build_layers_for(app, app.slide)
+
+        libre_capa = next(c for c in layers if c["type"] == "free")
+        self.assertEqual(libre_capa["text"], "Hola mundo")
+        self.assertEqual(libre_capa["color"], [1, 2, 3, 200])
+        self.assertEqual(libre_capa["font_family"], "lato")
+        self.assertTrue(libre_capa["bold"])
+        self.assertEqual(libre_capa["rotation"], 7.0)
+
+
 class TestAddDotsLayer(unittest.TestCase):
     def setUp(self):
         self.app = _make_app_with_two_slides()

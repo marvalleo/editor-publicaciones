@@ -93,6 +93,26 @@ def _layers_from_slide(slide, total_slides=1, active_index=0) -> list[dict]:
                 "stroke_on": layer.stroke_on,
                 "stroke_width": layer.stroke_width,
             })
+        elif layer.type == "text" and layer.role == "free":
+            layers.append({
+                "type": "free",
+                "key": layer.id,
+                "text": layer.text,
+                "x": layer.x,
+                "y": layer.y,
+                "size": layer.size,
+                "opacity": layer.opacity,
+                "rotation": layer.rotation,
+                "font_family": layer.font_family,
+                "bold": layer.bold,
+                "italic": layer.italic,
+                "underline": layer.underline,
+                "line_spacing": layer.line_spacing,
+                "letter_spacing": layer.letter_spacing,
+                "stroke_on": layer.stroke_on,
+                "stroke_width": layer.stroke_width,
+                "color": layer.color,
+            })
         elif layer.type == "box":
             layers.append({
                 "type": "desc",
