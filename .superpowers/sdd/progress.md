@@ -280,4 +280,26 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
   palabras a la mitad en el editor), omision del propio brief, no del implementador.
 - Tarea 6 (verificacion headless de cierre): complete, HEADLESS_OK (325 tests)
 
-Veredicto: pendiente de revision final de rama completa.
+# Revision final de rama completa (bloques de texto libre, cierre Fase 4)
+
+Revision final (modelo mas capaz): sin hallazgos Critical ni Important. Confirmado con
+`git diff` directo que dcpub/constants.py y dcpub/presets/palette.py tienen diff neto CERO entre
+el inicio y el final de la rama (el incidente de BLANCO de la Tarea 1 quedo completamente
+neutralizado). Rama "free" en compose() verificada como pipeline unico sin dual-path/gating
+(a diferencia de title/sub), reusa integramente los helpers de texto rico sin duplicar logica,
+y correctamente omite la sombra fija de marca. Encadenamiento de campos color/font_family/rotation
+verificado extremo a extremo: panel de propiedades -> adaptadores (app.py/exporter.py, mismas
+claves en preview y export) -> compose(). Multi-instancia confirmada segura por construccion
+(bbox_key por layer.id, sin asuncion de instancia canonica como title/sub). Proyectos legado
+cargan bien via default del dataclass (color nunca se lee de un dict crudo antes de normalizar
+al modelo).
+
+3 hallazgos Minor no bloqueantes, ya registrados en tareas anteriores: (1) tk.Text sin
+wrap="word" en el editor de texto libre (omision del brief, cosmetico); (2) comentario desactualizado
+en test_uses_own_color_not_brand_colors (dice "mas cercano al centro", en realidad es "primero de
+izquierda a derecha"); (3) align="left" fijo para bloques libres, consistente con title/sub, sin
+control de alineacion (fuera de alcance de esta sub-fase).
+
+Suite final: 325 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de Fase 4 del roadmap.
