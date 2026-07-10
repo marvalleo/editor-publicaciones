@@ -303,3 +303,8 @@ control de alineacion (fuera de alcance de esta sub-fase).
 Suite final: 325 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge a main. Con esto se cierra el alcance completo de Fase 4 del roadmap.
+
+# Fase 5 - Layouts A-E aplicables
+
+- Tarea 1 (datos de los 5 layouts, dcpub/presets/layouts.py): complete (commit debe64f,
+  review clean, 337 tests). Copia verbatim del brief, sin desviaciones.
