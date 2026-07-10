@@ -132,3 +132,26 @@ Plan: docs/superpowers/plans/2026-07-09-fase4-cta-caja.md
   self._selected + _build_property_panel directo, con el mismo _refresh_layers_list/_schedule_render
   que ya traia el brief. Sin regresion de comportamiento en la app real.
 - Tarea 10 (verificacion headless de cierre): complete (commit 33274a1..2bdde38, review clean, 247 tests, HEADLESS_OK)
+
+# Revision final de rama completa (Fase 4 sub-fase 1: CTA + caja configurable)
+
+Revision final: 1 hallazgo Important (no de implementacion, del propio diseno) — h=0.12 fijo
+como default/migracion de BoxLayer rompia la paridad visual "se ve igual que antes" para
+descripciones largas (4+ lineas, comunes en listas de beneficios importadas por lotes), porque
+el render legado usaba auto-height y 0.12*H podia quedar mas chico. Presentado al usuario, quien
+eligio h=0 (auto-height) en vez de mantener el fijo. Corregido en commit de fix b47d242: default
+en crear_slide_por_defecto y _LEGACY_BOX_DEFAULT_H en project_io.py pasan de 0.12 a 0.0 (w se
+mantiene en 0.90 sin cambios). 6 referencias a 0.12 encontradas y actualizadas (modelo, migracion,
+2 tests, script de verificacion x2). Re-revision del fix: aprobada. Nota Minor no bloqueante:
+test_partial_zero_w_h_box_layer_only_fixes_the_zero_dimension quedo tautologico en el eje h
+(0.0 entra, 0.0 sale) — no prueba que la migracion realmente corrio, deuda de cobertura aceptada.
+
+Otros hallazgos Minor de la revision final (no bloqueantes, no corregidos):
+- corner_r fijo (~0.033*W) puede exceder la mitad del alto/ancho en cajas muy chicas (min del
+  slider h=0.03) — cosmetico, Pillow no rompe, se corrige si se vuelve a tocar render.py.
+- Rangos de sliders w/h inline en vez de centralizados en un dict tipo BOX_WH_RANGE.
+- Desviacion de Tarea 9 (_add_cta_layer sin _set_selected) reconfirmada benigna en la revision final.
+
+Suite final: 247 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge.
