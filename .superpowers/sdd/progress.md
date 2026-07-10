@@ -249,3 +249,17 @@ Hallazgos de revision (agente independiente, modelo mas capaz) y correccion:
 Suite final: 312 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge a main.
+
+# Progreso — Fase 4 (cierre): bloques de texto libre
+
+Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
+
+- Tarea 1 (modelo: color en TextLayer): complete (commits b1299ea..23ad92e, review clean, 313 tests).
+  Hallazgo corregido en el momento (no llego a revision, se detecto antes): el brief tenia un dato
+  erroneo (asumia que BLANCO ya era el crema de marca #F7F1E8 sin verificar el valor real en
+  constants.py, que era blanco puro). El implementador seteo BLANCO=(247,241,232) siguiendo el
+  brief al pie de la letra, lo cual habria cambiado el color de titulo/subtitulo/caja/CTA en toda
+  la app (BLANCO se usa globalmente en render.py). Revertido en un segundo commit: constants.py y
+  palette.py vuelven a su estado exacto original (diff neto cero verificado), TextLayer.color
+  queda en list(BLANCO)+[255] = [255,255,255,255], el blanco real que usa hoy el titulo. El crema
+  de PALETA_PRINCIPAL es data de paleta para la futura Fase 5, todavia no esta cableada a compose().
