@@ -271,3 +271,5 @@ Plan: docs/superpowers/plans/2026-07-10-fase4-texto-libre.md
   distinguiendo color propio vs. color de marca correctamente). Nota Minor no bloqueante: el
   comentario del test dice "mas cercano al centro" pero en realidad es "primero de izquierda a
   derecha" — cosmetico, no afecta la cobertura.
+- Tarea 3 (adaptadores app.py/_build_layers_for + exporter.py/_layers_from_slide): complete
+  (commit 11609bb, review clean, 320 tests)
