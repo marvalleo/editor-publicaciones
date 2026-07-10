@@ -738,6 +738,27 @@ class TestKindOfDotsLayer(unittest.TestCase):
         self.assertEqual(App._kind_of(app, DotsLayer()), "dots")
 
 
+class TestAddTextLayer(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.calls = []
+        self.app._build_property_panel = lambda: self.calls.append("props")
+        self.app._refresh_layers_list = lambda: self.calls.append("layers")
+        self.app._schedule_render = lambda: self.calls.append("render")
+
+    def test_add_text_layer_appends_free_text_and_selects_it(self):
+        App._add_text_layer(self.app)
+
+        libre = self.app.slide.layers[-1]
+        self.assertEqual(libre.type, "text")
+        self.assertEqual(libre.role, "free")
+        self.assertEqual(libre.name, "Texto")
+        self.assertIs(self.app._selected, libre)
+        self.assertEqual(self.calls, ["props", "layers", "render"])
+
+
 class _FakeEvent:
     def __init__(self, x, y):
         self.x = x

@@ -273,6 +273,9 @@ class App(tk.Tk):
             fill=tk.X, pady=(0, 4), **pad)
         tk.Button(left, text="+ Agregar puntos", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_dots_layer).pack(
+            fill=tk.X, pady=(0, 4), **pad)
+        tk.Button(left, text="+ Agregar texto", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._add_text_layer).pack(
             fill=tk.X, pady=(0, 10), **pad)
 
         # Foto
@@ -566,6 +569,19 @@ class App(tk.Tk):
         from .commands import AddLayerCommand
         new_z = max((l.z for l in self.slide.layers), default=0) + 1
         new_layer = DotsLayer(name="Puntos de carrusel", z=new_z, x=0.50, y=0.94)
+        index = len(self.slide.layers)
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
+        self._selected = new_layer
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _add_text_layer(self):
+        from .models import TextLayer
+        from .commands import AddLayerCommand
+        new_z = max((l.z for l in self.slide.layers), default=0) + 1
+        new_layer = TextLayer(name="Texto", role="free", z=new_z,
+                               text="Texto libre", x=0.10, y=0.50, size=0.04)
         index = len(self.slide.layers)
         self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
         self._selected = new_layer
