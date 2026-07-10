@@ -35,7 +35,7 @@
       "layout_tag": null,
       "layers": [
         {
-          "id": "8897e4ae",
+          "id": "f1183e99",
           "name": "Foto",
           "type": "photo",
           "visible": true,
@@ -68,7 +68,7 @@
           }
         },
         {
-          "id": "a6454eb0",
+          "id": "1ae0e9a7",
           "name": "Logo",
           "type": "logo",
           "visible": true,
@@ -84,7 +84,7 @@
           "keep_ratio": true
         },
         {
-          "id": "4a2e95c8",
+          "id": "b1da7ba6",
           "name": "Título",
           "type": "text",
           "visible": true,
@@ -101,7 +101,7 @@
           "size": 0.087
         },
         {
-          "id": "05ee225f",
+          "id": "a93eb659",
           "name": "Subtítulo",
           "type": "text",
           "visible": true,
@@ -118,7 +118,7 @@
           "size": 0.05
         },
         {
-          "id": "4e900cf6",
+          "id": "deb5c053",
           "name": "Descripción",
           "type": "box",
           "visible": true,

@@ -41,7 +41,7 @@ def save_project(project: Project, path: Path) -> None:
 
 
 _LEGACY_BOX_DEFAULT_W = 0.90
-_LEGACY_BOX_DEFAULT_H = 0.12
+_LEGACY_BOX_DEFAULT_H = 0.0
 
 
 def load_project(path: Path) -> Project:

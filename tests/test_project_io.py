@@ -147,7 +147,7 @@ class TestLoadProjectMigratesLegacyBoxSize(unittest.TestCase):
 
         reloaded_desc = next(l for l in reloaded.slides[0].layers if l.type == "box")
         self.assertEqual(reloaded_desc.w, 0.90)
-        self.assertEqual(reloaded_desc.h, 0.12)
+        self.assertEqual(reloaded_desc.h, 0.0)
 
     def test_nonzero_w_h_box_layer_is_left_untouched_on_load(self):
         project = crear_proyecto_por_defecto("foto.jpg")
@@ -177,7 +177,7 @@ class TestLoadProjectMigratesLegacyBoxSize(unittest.TestCase):
 
         reloaded_desc = next(l for l in reloaded.slides[0].layers if l.type == "box")
         self.assertEqual(reloaded_desc.w, 0.5)
-        self.assertEqual(reloaded_desc.h, 0.12)
+        self.assertEqual(reloaded_desc.h, 0.0)
 
     def test_zero_w_h_cta_layer_is_not_migrated(self):
         project = crear_proyecto_por_defecto("foto.jpg")

@@ -44,8 +44,8 @@ def main():
     desc = next(l for l in project.slides[0].layers if l.type == "box")
     desc.text = "Descripción de prueba"
 
-    # Render con la caja de descripcion default (w=0.90,h=0.12 fijados en el
-    # modelo) vs. con colores/tamaño no default.
+    # Render con la caja de descripcion default (w=0.90 fijado, h=0.0 = auto
+    # altura segun el contenido de texto) vs. con colores/tamaño no default.
     render_default, _ = compose([_layer_dict_box(desc)], canvas_size, font_manager)
     render_default.save(OUT_DIR / "caja_default.png")
 
@@ -86,7 +86,7 @@ def main():
     reloaded_legacy = load_project(legacy_path)
     reloaded_legacy_desc = next(l for l in reloaded_legacy.slides[0].layers if l.type == "box")
     assert reloaded_legacy_desc.w == 0.90
-    assert reloaded_legacy_desc.h == 0.12
+    assert reloaded_legacy_desc.h == 0.0
 
     # Importador por lotes crea CTALayer real.
     import_dir = OUT_DIR / "importar"

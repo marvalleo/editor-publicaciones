@@ -200,7 +200,7 @@ def crear_slide_por_defecto(
                   size=0.087, text=titulo),
         TextLayer(name="Subtítulo", z=3, x=0.50, y=0.55,
                   role="subtitle", size=0.050, text=subtitulo),
-        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808, w=0.90, h=0.12,
+        BoxLayer(name="Descripción", z=4, x=0.05, y=0.808, w=0.90, h=0.0,
                  size=0.033, text=descripcion, icon="planta"),
     ]
     return slide
