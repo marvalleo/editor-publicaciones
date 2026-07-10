@@ -483,6 +483,112 @@ class TestCTABox(unittest.TestCase):
         self.assertIn("cta", bboxes)
 
 
+class TestLineLayerRender(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "line", "key": "linea", "x": 0.5, "y": 0.5,
+                "length": 0.40, "thickness": 0.02,
+                "color": [255, 0, 0, 255], "gap": 0.0,
+                "rotation": 0.0, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_line_without_gap_draws_single_centered_segment(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer()], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertEqual(img.getpixel((50, 50)), (255, 0, 0, 255))
+        self.assertEqual(img.getpixel((29, 50)), (0, 0, 0, 0))
+        self.assertEqual(img.getpixel((71, 50)), (0, 0, 0, 0))
+
+    def test_line_with_gap_draws_two_segments_and_keeps_center_empty(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(gap=0.20)], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertEqual(img.getpixel((50, 50)), (0, 0, 0, 0))
+        self.assertEqual(img.getpixel((35, 50)), (255, 0, 0, 255))
+        self.assertEqual(img.getpixel((65, 50)), (255, 0, 0, 255))
+
+    def test_line_opacity_zero_keeps_bbox_but_draws_no_pixels(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(opacity=0.0)], (100, 100), self._font_manager())
+
+        self.assertIn("linea", bboxes)
+        self.assertIsNone(img.getbbox())
+
+    def test_line_rotation_changes_rendered_pixels(self):
+        from dcpub.render import compose
+        img_plain, _ = compose([self._layer(rotation=0.0)], (100, 100), self._font_manager())
+        img_rotated, _ = compose([self._layer(rotation=30.0)], (100, 100), self._font_manager())
+
+        self.assertNotEqual(list(img_plain.getdata()), list(img_rotated.getdata()))
+
+
+class TestDotsLayerRender(unittest.TestCase):
+    def _font_manager(self):
+        from dcpub.fonts import FontManager
+        return FontManager()
+
+    def _layer(self, **overrides):
+        base = {"type": "dots", "key": "puntos", "x": 0.5, "y": 0.5,
+                "count": 3, "active": 1, "color": [0, 255, 0, 255],
+                "spacing": 0.10, "opacity": 1.0}
+        base.update(overrides)
+        return base
+
+    def test_dots_draws_count_circles_and_active_is_larger(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer()], (100, 100), self._font_manager())
+
+        self.assertIn("puntos", bboxes)
+        # Los 3 centros (2 puntos base + 1 activo) deben estar pintados.
+        self.assertEqual(img.getpixel((40, 50)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((50, 50)), (0, 255, 0, 255))
+        self.assertEqual(img.getpixel((60, 50)), (0, 255, 0, 255))
+        # El punto activo (x=50) debe tener mayor radio vertical que uno
+        # base (x=40): se mide cuantos pixeles opacos hay en cada columna,
+        # sin asumir un radio fijo en pixeles.
+        opaque_active = sum(1 for y in range(30, 70) if img.getpixel((50, y))[3] > 0)
+        opaque_base = sum(1 for y in range(30, 70) if img.getpixel((40, y))[3] > 0)
+        self.assertGreater(opaque_active, opaque_base)
+        # Bien por fuera de cualquier circulo debe quedar transparente.
+        self.assertEqual(img.getpixel((40, 30)), (0, 0, 0, 0))
+
+    def test_dots_opacity_zero_keeps_bbox_but_draws_no_pixels(self):
+        from dcpub.render import compose
+        img, bboxes = compose([self._layer(opacity=0.0)], (100, 100), self._font_manager())
+
+        self.assertIn("puntos", bboxes)
+        self.assertIsNone(img.getbbox())
+
+    def test_dots_render_as_discrete_circles_at_realistic_canvas_width(self):
+        """A resolucion real (1080), los radios fijos en fraccion de W
+        superaban el rango completo del slider de spacing, fusionando los
+        puntos en una sola mancha. Los puntos deben verse como circulos
+        separados en el spacing por defecto (0.025)."""
+        from dcpub.render import compose
+        W = 1080
+        count = 5
+        img, bboxes = compose(
+            [self._layer(count=count, active=2, spacing=0.025)], (W, W), self._font_manager())
+        x0, y0, x1, y1 = bboxes["puntos"]
+        mid_y = (y0 + y1) // 2
+        opaque = [img.getpixel((x, mid_y))[3] > 0 for x in range(x0, x1)]
+        runs = 0
+        previous = False
+        for is_opaque in opaque:
+            if is_opaque and not previous:
+                runs += 1
+            previous = is_opaque
+        self.assertEqual(runs, count,
+                          "los puntos deben verse como circulos separados, no una mancha continua")
+
+
 class TestTrackedTextHelpers(unittest.TestCase):
     def _font(self):
         from dcpub.fonts import FontManager

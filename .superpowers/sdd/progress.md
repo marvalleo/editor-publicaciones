@@ -208,3 +208,44 @@ render de mas en no-op (ya registrado en Tarea 8).
 Suite final: 282 tests OK. Headless: HEADLESS_OK.
 
 Veredicto: aprobada para merge a main.
+
+# Progreso — Fase 4: lineas decorativas + puntos de carrusel
+
+Plan: docs/superpowers/plans/2026-07-10-fase4-lineas-puntos-tareas-codex.md
+
+Implementado por Codex en una sesion externa (copia aislada por fallo de permisos de git
+worktree en su sandbox), traido a este repo como rama `codex/fase4-lineas-puntos` a partir del
+commit b5b7426 (un solo commit combinando Track A LineLayer + Track B DotsLayer, en vez de las
+9+9 tareas separadas del listado original).
+
+- LineLayer + DotsLayer en dcpub/models.py, ramas "line"/"dots" en compose(), botones agregar,
+  sliders/color picker en panel de propiedades, resize por handle adaptado, adaptadores
+  app.py/exporter.py, tests, verificacion headless. Las 6 decisiones de diseno del listado de
+  tareas fueron seguidas correctamente (verificado en revision).
+
+Hallazgos de revision (agente independiente, modelo mas capaz) y correccion:
+- Hallazgo previo a la revision formal: corrupcion de encoding real (caracter '?' literal en vez
+  de tildes/ene) en 11 strings de dcpub/app.py, tests y script de verificacion. Corregido en
+  commit 7ffd6e7 antes de la revision.
+- Important corregido (commit 47b0fd0): radios de DotsLayer eran fraccion fija de W (base ~74px,
+  activo ~140px a W=1080), mayor que todo el rango del slider de spacing (5-129px), por lo que
+  los puntos se fusionaban en una mancha a resolucion real. Ahora se recortan al spacing
+  disponible. Cubierto por test nuevo a canvas realista (1080px) que verifica circulos discretos.
+- Important corregido (commit 47b0fd0): _build_layers_for usaba self.current_slide_index para el
+  punto activo en vez de self.project.slides.index(slide), por lo que SlidesPanel (que llama
+  _build_layers_for por cada lamina del panel) resaltaba el punto activo equivocado en miniaturas
+  de laminas no activas. El test original de Codex para este caso tenia el mismo defecto (seteaba
+  current_slide_index sin mover app.slide, estado que no ocurre en la app real); se corrigio el
+  test tambien.
+- Minor corregido: cobertura de round-trip to_dict/from_dict para LineLayer/DotsLayer (pedida por
+  las tareas A1/B1 originales, faltaba).
+- Minor no corregido (diferido): boton "+ Agregar puntos" no tiene guard/aviso para proyectos de
+  una sola lamina (pedido opcional del listado de tareas). No bloqueante: el render ya maneja
+  count<=1 sin romper (dibuja un solo punto o nada).
+- Minor no corregido (cosmetico, no bloqueante): reasignacion redundante de `draw` al final de las
+  ramas "line"/"dots"; DotsLayer hereda `rotation` de Layer pero el render la ignora (intencional,
+  el panel no expone rotacion para puntos, sin comentario explicito).
+
+Suite final: 312 tests OK. Headless: HEADLESS_OK.
+
+Veredicto: aprobada para merge a main.

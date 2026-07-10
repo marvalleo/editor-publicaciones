@@ -115,12 +115,30 @@ class CTALayer(Layer):
     text_color: list = field(default_factory=lambda: list(BLANCO) + [255])
 
 
+@dataclass
+class LineLayer(Layer):
+    type: str = "line"
+    length: float = 0.22
+    thickness: float = 0.003
+    color: list = field(default_factory=lambda: list(VERDE) + [255])
+    gap: float = 0.0
+
+
+@dataclass
+class DotsLayer(Layer):
+    type: str = "dots"
+    color: list = field(default_factory=lambda: list(VERDE) + [255])
+    spacing: float = 0.025
+
+
 LAYER_CLASSES = {
     "photo": PhotoLayer,
     "logo": LogoLayer,
     "text": TextLayer,
     "box": BoxLayer,
     "cta": CTALayer,
+    "line": LineLayer,
+    "dots": DotsLayer,
 }
 
 

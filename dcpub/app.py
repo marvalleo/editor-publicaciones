@@ -31,7 +31,7 @@ SIZE_RANGE = {
 }
 
 LABELS = {"logo": "Logo", "title": "Título", "sub": "Subtítulo", "desc": "Descripción",
-          "cta": "CTA"}
+          "cta": "CTA", "line": "Línea", "dots": "Puntos"}
 
 # Rangos de los ajustes fotográficos, alineados a los clamps de render.py
 ADJUST_RANGE = {
@@ -267,6 +267,12 @@ class App(tk.Tk):
 
         tk.Button(left, text="+ Agregar CTA", bg="#3d3d3d", fg=TEXT, relief="flat",
                   font=("Segoe UI", 8), command=self._add_cta_layer).pack(
+            fill=tk.X, pady=(0, 4), **pad)
+        tk.Button(left, text="+ Agregar línea", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._add_line_layer).pack(
+            fill=tk.X, pady=(0, 4), **pad)
+        tk.Button(left, text="+ Agregar puntos", bg="#3d3d3d", fg=TEXT, relief="flat",
+                  font=("Segoe UI", 8), command=self._add_dots_layer).pack(
             fill=tk.X, pady=(0, 10), **pad)
 
         # Foto
@@ -543,6 +549,30 @@ class App(tk.Tk):
         self._refresh_layers_list()
         self._schedule_render()
 
+    def _add_line_layer(self):
+        from .models import LineLayer
+        from .commands import AddLayerCommand
+        new_z = max((l.z for l in self.slide.layers), default=0) + 1
+        new_layer = LineLayer(name="Línea", z=new_z, x=0.50, y=0.70)
+        index = len(self.slide.layers)
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
+        self._selected = new_layer
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
+    def _add_dots_layer(self):
+        from .models import DotsLayer
+        from .commands import AddLayerCommand
+        new_z = max((l.z for l in self.slide.layers), default=0) + 1
+        new_layer = DotsLayer(name="Puntos de carrusel", z=new_z, x=0.50, y=0.94)
+        index = len(self.slide.layers)
+        self.commands.push(AddLayerCommand(self.slide.layers, new_layer, index))
+        self._selected = new_layer
+        self._build_property_panel()
+        self._refresh_layers_list()
+        self._schedule_render()
+
     def _delete_layer(self, layer):
         from .commands import DeleteLayerCommand
         self.commands.push(DeleteLayerCommand(self.slide.layers, layer))
@@ -608,8 +638,9 @@ class App(tk.Tk):
             self._build_photo_adjust_section(card, layer, token, disabled)
             return
 
-        smin, smax = SIZE_RANGE[kind]
-        size_label = "Tamaño del logo" if kind == "logo" else "Tamaño de fuente"
+        if kind not in ("line", "dots"):
+            smin, smax = SIZE_RANGE[kind]
+            size_label = "Tamaño del logo" if kind == "logo" else "Tamaño de fuente"
         self._slider(card, token, "x", "Posición X", 0.0, 1.0, disabled=disabled)
         self._slider(card, token, "y", "Posición Y", 0.0, 1.0, disabled=disabled)
         if kind in ("desc", "cta"):
@@ -617,6 +648,18 @@ class App(tk.Tk):
             self._slider(card, token, "h", "Alto de la caja", 0.03, 0.50, disabled=disabled)
             self._color_picker(card, layer, "fill", "Color de la caja", disabled=disabled)
             self._color_picker(card, layer, "text_color", "Color del texto", disabled=disabled)
+        if kind == "line":
+            self._slider(card, token, "length", "Largo", 0.05, 0.80, disabled=disabled)
+            self._slider(card, token, "thickness", "Grosor", 0.001, 0.03, disabled=disabled)
+            self._slider(card, token, "gap", "Separación", 0.0, 0.30, disabled=disabled)
+            self._color_picker(card, layer, "color", "Color de línea", disabled=disabled)
+        if kind == "dots":
+            total = len(self.project.slides)
+            active = self.current_slide_index + 1
+            tk.Label(card, text=f"Carrusel: {active}/{total}", bg=PANEL, fg=MUTED,
+                     font=("Segoe UI", 8)).pack(anchor="w", pady=(8, 0))
+            self._slider(card, token, "spacing", "Separación", 0.005, 0.12, disabled=disabled)
+            self._color_picker(card, layer, "color", "Color de puntos", disabled=disabled)
         if kind == "cta":
             tk.Label(card, text="Texto del CTA", bg=PANEL, fg=TEXT,
                      font=("Segoe UI", 8)).pack(anchor="w", pady=(8, 0))
@@ -636,7 +679,8 @@ class App(tk.Tk):
                     self._on_cta_text_commit(l, old, v.get()))
         if kind in ("title", "sub"):
             self._build_text_style_section(card, layer, token, disabled)
-        self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
+        if kind not in ("line", "dots"):
+            self._slider(card, token, "size", size_label, smin, smax, disabled=disabled)
         self._slider(card, token, "opacity", "Opacidad", 0.0, 1.0,
                      disabled=disabled, as_percent=True)
 
@@ -960,6 +1004,10 @@ class App(tk.Tk):
             return "desc"
         if layer.type == "cta":
             return "cta"
+        if layer.type == "line":
+            return "line"
+        if layer.type == "dots":
+            return "dots"
         return None
 
     def _token_for_layer(self, layer):
@@ -1354,9 +1402,20 @@ class App(tk.Tk):
                 f"Foto · Zoom: {layer.zoom:.2f}  "
                 f"Recorte: {layer.offset_x:.2f}, {layer.offset_y:.2f}")
             return
-        tam = layer.w if kind == "logo" else layer.size
+        if kind == "logo":
+            tam = layer.w
+            size_label = "Tamaño"
+        elif kind == "line":
+            tam = layer.length
+            size_label = "Largo"
+        elif kind == "dots":
+            tam = layer.spacing
+            size_label = "Separación"
+        else:
+            tam = layer.size
+            size_label = "Tamaño"
         self.v_readout.set(
-            f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  Tamaño: {tam:.3f}")
+            f"{LABELS[kind]} · X: {layer.x:.3f}  Y: {layer.y:.3f}  {size_label}: {tam:.3f}")
 
     def _draw_selection_overlay(self):
         self._handles = {}
@@ -1403,6 +1462,13 @@ class App(tk.Tk):
                 return name
         return None
 
+    def _resize_param_for_kind(self, kind):
+        if kind == "line":
+            return "length"
+        if kind == "dots":
+            return "spacing"
+        return "size"
+
     def _start_resize(self, event):
         kind = self._kind_of(self._selected)
         token = self._token_for_layer(self._selected)
@@ -1418,7 +1484,8 @@ class App(tk.Tk):
             "token": token,
             "center": (cx_img, cy_img),
             "start_dist": start_dist,
-            "start_value": self._get_layer_value(token, "size"),
+            "param": self._resize_param_for_kind(kind),
+            "start_value": self._get_layer_value(token, self._resize_param_for_kind(kind)),
         }
 
     def _apply_resize(self, event):
@@ -1428,9 +1495,15 @@ class App(tk.Tk):
         ix, iy = self._canvas_to_img(event.x, event.y)
         dist = max(1.0, ((ix - cx_img) ** 2 + (iy - cy_img) ** 2) ** 0.5)
         ratio = dist / self._resize["start_dist"]
-        smin, smax = SIZE_RANGE[kind]
+        param = self._resize["param"]
+        if param == "length":
+            smin, smax = 0.05, 0.80
+        elif param == "spacing":
+            smin, smax = 0.005, 0.12
+        else:
+            smin, smax = SIZE_RANGE[kind]
         new_value = min(smax, max(smin, self._resize["start_value"] * ratio))
-        self._set_layer_value(token, "size", new_value)
+        self._set_layer_value(token, param, new_value)
         self._sync_sliders()
         self._render_now()
 
@@ -1601,6 +1674,19 @@ class App(tk.Tk):
                                 "x": layer.x, "y": layer.y, "w": layer.w, "h": layer.h,
                                 "size": layer.size, "fill": layer.fill,
                                 "text_color": layer.text_color, "opacity": layer.opacity})
+            elif layer.type == "line":
+                layers.append({"type": "line", "key": layer.id,
+                                "x": layer.x, "y": layer.y,
+                                "length": layer.length, "thickness": layer.thickness,
+                                "color": layer.color, "gap": layer.gap,
+                                "rotation": layer.rotation, "opacity": layer.opacity})
+            elif layer.type == "dots":
+                layers.append({"type": "dots", "key": layer.id,
+                                "x": layer.x, "y": layer.y,
+                                "count": len(self.project.slides),
+                                "active": self.project.slides.index(slide),
+                                "color": layer.color, "spacing": layer.spacing,
+                                "opacity": layer.opacity})
         return layers
 
     def _build_layers(self):
@@ -1797,10 +1883,11 @@ class App(tk.Tk):
                     ]))
                 self._sync_shared_logo_if_active()
             else:
-                new_value = self._get_layer_value(token, "size")
+                param = self._resize.get("param", "size")
+                new_value = self._get_layer_value(token, param)
                 if old_value != new_value:
                     from .commands import PropertyChangeCommand
-                    self.commands.push(PropertyChangeCommand(layer, "size", old_value, new_value))
+                    self.commands.push(PropertyChangeCommand(layer, param, old_value, new_value))
                     if self._kind_of(layer) == "logo":
                         self._sync_shared_logo_if_active()
         self._drag_elem = None

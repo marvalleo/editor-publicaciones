@@ -591,3 +591,210 @@ class TestSyncSharedLogoOnNudgeAndCenter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBuildLayersForLineLayer(unittest.TestCase):
+    def test_build_layers_for_includes_line_layer(self):
+        from dcpub.models import LineLayer
+        app = _make_app_with_two_slides()
+        line = LineLayer(name="Línea", z=10, x=0.5, y=0.7,
+                         length=0.30, thickness=0.004,
+                         color=[1, 2, 3, 200], gap=0.05,
+                         rotation=15.0, opacity=0.6)
+        app.slide.layers.append(line)
+
+        layers = App._build_layers_for(app, app.slide)
+
+        line_dict = next(layer for layer in layers if layer["type"] == "line")
+        self.assertEqual(line_dict["key"], line.id)
+        self.assertEqual(line_dict["x"], 0.5)
+        self.assertEqual(line_dict["y"], 0.7)
+        self.assertEqual(line_dict["length"], 0.30)
+        self.assertEqual(line_dict["thickness"], 0.004)
+        self.assertEqual(line_dict["color"], [1, 2, 3, 200])
+        self.assertEqual(line_dict["gap"], 0.05)
+        self.assertEqual(line_dict["rotation"], 15.0)
+        self.assertEqual(line_dict["opacity"], 0.6)
+
+
+class TestAddLineLayer(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.calls = []
+        self.app._build_property_panel = lambda: self.calls.append("props")
+        self.app._refresh_layers_list = lambda: self.calls.append("layers")
+        self.app._schedule_render = lambda: self.calls.append("render")
+
+    def test_add_line_layer_appends_layer_and_selects_it(self):
+        App._add_line_layer(self.app)
+
+        line = self.app.slide.layers[-1]
+        self.assertEqual(line.type, "line")
+        self.assertEqual(line.name, "Línea")
+        self.assertIs(self.app._selected, line)
+        self.assertEqual(self.calls, ["props", "layers", "render"])
+
+    def test_add_line_layer_is_undoable(self):
+        before = len(self.app.slide.layers)
+        App._add_line_layer(self.app)
+
+        self.app.commands.undo()
+
+        self.assertEqual(len(self.app.slide.layers), before)
+
+
+class TestKindOfLineLayer(unittest.TestCase):
+    def test_kind_of_line_layer_is_line(self):
+        from dcpub.models import LineLayer
+        app = App.__new__(App)
+
+        self.assertEqual(App._kind_of(app, LineLayer()), "line")
+
+
+class TestBuildLayersForDotsLayer(unittest.TestCase):
+    def test_build_layers_for_includes_dots_with_project_count_and_active_index(self):
+        from dcpub.models import DotsLayer
+        app = _make_app_with_two_slides()
+        app.current_slide_index = 1
+        app.slide = app.project.slides[1]
+        dots = DotsLayer(name="Puntos", z=10, x=0.5, y=0.9,
+                         color=[1, 2, 3, 200], spacing=0.04,
+                         opacity=0.7)
+        app.slide.layers.append(dots)
+
+        layers = App._build_layers_for(app, app.slide)
+
+        dots_dict = next(layer for layer in layers if layer["type"] == "dots")
+        self.assertEqual(dots_dict["count"], 2)
+        self.assertEqual(dots_dict["active"], 1)
+        self.assertEqual(dots_dict["color"], [1, 2, 3, 200])
+        self.assertEqual(dots_dict["spacing"], 0.04)
+        self.assertEqual(dots_dict["opacity"], 0.7)
+
+    def test_build_layers_for_non_active_slide_uses_that_slides_own_index(self):
+        """Reproduce el bug de miniaturas: SlidesPanel llama
+        _build_layers_for(slide) para CADA lámina del panel, no solo la
+        activa. El punto activo debe reflejar la posición de esa lámina
+        dentro de project.slides, no self.current_slide_index (que sigue
+        apuntando a la lámina que el usuario tiene seleccionada)."""
+        from dcpub.models import DotsLayer
+        app = _make_app_with_two_slides()
+        app.current_slide_index = 0
+        segunda = app.project.slides[1]
+        segunda.layers.append(DotsLayer(name="Puntos", z=10))
+
+        layers = App._build_layers_for(app, segunda)
+
+        dots_dict = next(layer for layer in layers if layer["type"] == "dots")
+        self.assertEqual(dots_dict["active"], 1)
+
+
+class TestAddDotsLayer(unittest.TestCase):
+    def setUp(self):
+        self.app = _make_app_with_two_slides()
+        from dcpub.commands import CommandStack
+        self.app.commands = CommandStack()
+        self.calls = []
+        self.app._build_property_panel = lambda: self.calls.append("props")
+        self.app._refresh_layers_list = lambda: self.calls.append("layers")
+        self.app._schedule_render = lambda: self.calls.append("render")
+
+    def test_add_dots_layer_appends_layer_and_selects_it(self):
+        App._add_dots_layer(self.app)
+
+        dots = self.app.slide.layers[-1]
+        self.assertEqual(dots.type, "dots")
+        self.assertEqual(dots.name, "Puntos de carrusel")
+        self.assertIs(self.app._selected, dots)
+        self.assertEqual(self.calls, ["props", "layers", "render"])
+
+
+class TestKindOfDotsLayer(unittest.TestCase):
+    def test_kind_of_dots_layer_is_dots(self):
+        from dcpub.models import DotsLayer
+        app = App.__new__(App)
+
+        self.assertEqual(App._kind_of(app, DotsLayer()), "dots")
+
+
+class _FakeEvent:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+class TestGeometricLayerPanelMetadata(unittest.TestCase):
+    def test_line_and_dots_have_labels_but_no_size_range_requirement(self):
+        from dcpub.app import LABELS, SIZE_RANGE
+
+        self.assertEqual(LABELS["line"], "Línea")
+        self.assertEqual(LABELS["dots"], "Puntos")
+        self.assertNotIn("line", SIZE_RANGE)
+        self.assertNotIn("dots", SIZE_RANGE)
+
+
+class TestResizeGeometricLayers(unittest.TestCase):
+    def _app_for_layer(self, layer):
+        app = App.__new__(App)
+        app.project = crear_proyecto_por_defecto("foto.jpg")
+        app.slide = app.project.slides[0]
+        app.slide.layers.append(layer)
+        app._selected = layer
+        app._last_bboxes = {layer.id: (40, 45, 60, 55)}
+        app._bbox_key_for_layer = lambda l: l.id
+        app._canvas_to_img = lambda x, y: (x, y)
+        app._sync_sliders = lambda: None
+        app._render_now = lambda: None
+        return app
+
+    def test_line_resize_uses_length_not_missing_size(self):
+        from dcpub.models import LineLayer
+        line = LineLayer(length=0.20)
+        app = self._app_for_layer(line)
+
+        App._start_resize(app, _FakeEvent(60, 50))
+        App._apply_resize(app, _FakeEvent(70, 50))
+
+        self.assertGreater(line.length, 0.20)
+
+    def test_dots_resize_uses_spacing_not_missing_size(self):
+        from dcpub.models import DotsLayer
+        dots = DotsLayer(spacing=0.02)
+        app = self._app_for_layer(dots)
+
+        App._start_resize(app, _FakeEvent(60, 50))
+        App._apply_resize(app, _FakeEvent(70, 50))
+
+        self.assertGreater(dots.spacing, 0.02)
+
+
+class _FakeReadout:
+    def __init__(self):
+        self.value = ""
+
+    def set(self, value):
+        self.value = value
+
+
+class TestGeometricLayerReadout(unittest.TestCase):
+    def test_line_readout_uses_length(self):
+        from dcpub.models import LineLayer
+        app = App.__new__(App)
+        app._selected = LineLayer(x=0.1, y=0.2, length=0.33)
+        app.v_readout = _FakeReadout()
+
+        App._update_readout(app)
+
+        self.assertIn("Largo: 0.330", app.v_readout.value)
+
+    def test_dots_readout_uses_spacing(self):
+        from dcpub.models import DotsLayer
+        app = App.__new__(App)
+        app._selected = DotsLayer(x=0.1, y=0.2, spacing=0.04)
+        app.v_readout = _FakeReadout()
+
+        App._update_readout(app)
+
+        self.assertIn("Separación: 0.040", app.v_readout.value)
