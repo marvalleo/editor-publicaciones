@@ -29,10 +29,25 @@ DEFAULT_PALETTE = {
 }
 
 
-def draw_icon(draw, x, y, size, icon_type, color):
-    lw = max(2, size // 16)
-    cx, cy = x + size // 2, y + size // 2
-    r = size // 2 - lw * 2
+ICON_SUPERSAMPLE = 4
+
+
+def draw_icon(size, icon_type, color):
+    """Dibuja un ícono de marca (planta/montaña/corazón/cabaña) en su
+    propia imagen RGBA de `size`x`size`, lista para componer con
+    `canvas.alpha_composite(img, (x, y))`.
+
+    Se dibuja a resolución supersampleada (x4) y se reescala hacia abajo
+    con LANCZOS para lograr bordes suaves: dibujado directo al tamaño
+    final (~24-70px), PIL no antialiasea líneas/arcos y los íconos
+    quedaban dentados."""
+    hi = size * ICON_SUPERSAMPLE
+    img = Image.new("RGBA", (hi, hi), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    lw = max(2, hi // 16)
+    cx, cy = hi // 2, hi // 2
+    r = hi // 2 - lw * 2
 
     if icon_type == "planta":
         draw.line([(cx, cy + r), (cx, cy - r // 2)], fill=color, width=lw)
@@ -60,6 +75,8 @@ def draw_icon(draw, x, y, size, icon_type, color):
         draw.rectangle([(cx - hw, cy), (cx + hw, cy + r)], outline=color, width=lw)
         pw = hw // 2
         draw.rectangle([(cx - pw // 2, cy + r // 2), (cx + pw // 2, cy + r)], outline=color, width=lw)
+
+    return img.resize((size, size), Image.LANCZOS)
 
 
 def wrap_text(text, font, max_w, draw):
@@ -797,10 +814,8 @@ def compose(layers, canvas_size, font_manager, palette=None):
                 text_color = _apply_opacity(text_color_value, opacity)
                 if icon != "ninguno":
                     iy = by + (box_h - icon_sz) // 2
-                    icon_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-                    icon_draw = ImageDraw.Draw(icon_layer)
-                    draw_icon(icon_draw, bx + pad, iy, icon_sz, icon, icon_color)
-                    canvas = Image.alpha_composite(canvas, icon_layer)
+                    icon_img = draw_icon(icon_sz, icon, icon_color)
+                    canvas.alpha_composite(icon_img, (bx + pad, iy))
                     draw = ImageDraw.Draw(canvas)
 
                 dy = by + (box_h - text_h) // 2
