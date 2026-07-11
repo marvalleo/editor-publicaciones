@@ -3,11 +3,52 @@
 import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
 
 from .constants import VERDE, BLANCO, BOX_COLOR, LOGO_FILE, TEXT_STROKE_COLOR
 
 _bg_cache = {"key": None, "img": None}
+
+ICONS_DIR = Path(__file__).resolve().parent / "assets" / "icons"
+
+ICON_IMAGE_FILES = {
+    "árbol": "arbol.png",
+    "cabaña": "cabana.png",
+    "tinaja": "tinaja.png",
+    "cama": "cama.png",
+    "familia": "familia.png",
+    "taza": "taza.png",
+    "cubiertos": "cubiertos.png",
+    "mapa": "mapa.png",
+    "corazón": "corazon.png",
+}
+
+_icon_mask_cache = {}
+
+
+def _icon_mask(name):
+    """Carga y cachea el canal alfa (silueta pura, sin color horneado) del
+    ícono de imagen `name`, para poder recolorearlo dinámicamente igual
+    que los íconos dibujados a mano."""
+    cached = _icon_mask_cache.get(name)
+    if cached is not None:
+        return cached
+    mask = Image.open(ICONS_DIR / ICON_IMAGE_FILES[name]).convert("RGBA").split()[-1]
+    _icon_mask_cache[name] = mask
+    return mask
+
+
+def _fit_mask(mask, size):
+    """Reescala `mask` para que quepa dentro de un lienzo size x size
+    preservando su relación de aspecto original (las imágenes fuente no
+    son cuadradas), centrado, con relleno transparente alrededor."""
+    src_w, src_h = mask.size
+    scale = min(size / src_w, size / src_h)
+    new_w, new_h = max(1, round(src_w * scale)), max(1, round(src_h * scale))
+    resized = mask.resize((new_w, new_h), Image.LANCZOS)
+    canvas = Image.new("L", (size, size), 0)
+    canvas.paste(resized, ((size - new_w) // 2, (size - new_h) // 2))
+    return canvas
 
 DEFAULT_ADJUST = {
     "brightness": 1.0,
@@ -34,14 +75,21 @@ ICON_SUPERSAMPLE = 4
 
 
 def draw_icon(size, icon_type, color):
-    """Dibuja un ícono de marca (planta/montaña/corazón/cabaña) en su
-    propia imagen RGBA de `size`x`size`, lista para componer con
-    `canvas.alpha_composite(img, (x, y))`.
+    """Devuelve un ícono de marca de `size`x`size`, listo para componer
+    con `canvas.alpha_composite(img, (x, y))`.
 
-    Se dibuja a resolución supersampleada (x4) y se reescala hacia abajo
-    con LANCZOS para lograr bordes suaves: dibujado directo al tamaño
-    final (~24-70px), PIL no antialiasea líneas/arcos y los íconos
-    quedaban dentados."""
+    Para los íconos con imagen fuente en ICON_IMAGE_FILES, recolorea la
+    silueta (canal alfa) de esa imagen dinámicamente con `color`. Para el
+    resto, dibuja a mano a resolución supersampleada (x4) y reescala
+    hacia abajo con LANCZOS para lograr bordes suaves: dibujado directo
+    al tamaño final (~24-70px), PIL no antialiasea líneas/arcos y los
+    íconos quedaban dentados."""
+    if icon_type in ICON_IMAGE_FILES:
+        mask = _fit_mask(_icon_mask(icon_type), size)
+        img = Image.new("RGBA", (size, size), color)
+        img.putalpha(ImageChops.multiply(img.split()[-1], mask))
+        return img
+
     hi = size * ICON_SUPERSAMPLE
     img = Image.new("RGBA", (hi, hi), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -62,22 +110,6 @@ def draw_icon(size, icon_type, color):
         pts2 = [(cx, cy + r), (cx + r * 2 // 3, cy - r // 2), (cx + r, cy + r)]
         for i in range(len(pts2)):
             draw.line([pts2[i], pts2[(i + 1) % len(pts2)]], fill=color, width=lw)
-
-    elif icon_type == "corazón":
-        hr = r // 2
-        draw.arc([(cx - r, cy - hr), (cx, cy + hr)], 180, 360, fill=color, width=lw)
-        draw.arc([(cx, cy - hr), (cx + r, cy + hr)], 180, 360, fill=color, width=lw)
-        draw.line([(cx - r, cy + hr), (cx, cy + r * 3 // 2)], fill=color, width=lw)
-        draw.line([(cx + r, cy + hr), (cx, cy + r * 3 // 2)], fill=color, width=lw)
-
-    elif icon_type == "cabaña":
-        draw.polygon([(cx - r, cy), (cx, cy - r), (cx + r, cy)], outline=color, width=lw)
-        hw = r * 2 // 3
-        draw.rectangle([(cx - hw, cy), (cx + hw, cy + r)], outline=color, width=lw)
-        pw = hw // 2
-        draw.rectangle([(cx - pw // 2, cy + r // 2), (cx + pw // 2, cy + r)], outline=color, width=lw)
-        chim_x = cx + r * 0.45
-        draw.line([(chim_x, cy - r * 0.55), (chim_x, cy - r * 0.05)], fill=color, width=lw)
 
     elif icon_type == "fuego":
         pts = [
@@ -119,104 +151,6 @@ def draw_icon(size, icon_type, color):
             x1 = cx + math.cos(ang) * r
             y1 = cy + math.sin(ang) * r
             draw.line([(x0, y0), (x1, y1)], fill=color, width=lw)
-
-    elif icon_type == "árbol":
-        draw.polygon([(cx - r * 0.85, cy + r * 0.15), (cx, cy - r), (cx + r * 0.85, cy + r * 0.15)],
-                     outline=color, width=lw)
-        draw.polygon([(cx - r * 0.6, cy + r * 0.55), (cx, cy - r * 0.25), (cx + r * 0.6, cy + r * 0.55)],
-                     outline=color, width=lw)
-        draw.line([(cx, cy + r * 0.5), (cx, cy + r)], fill=color, width=lw)
-
-    elif icon_type == "taza":
-        cup_w, cup_h = r * 1.0, r * 0.8
-        cup_cy = cy + r * 0.15
-        x0, y0 = cx - cup_w / 2, cup_cy - cup_h / 2
-        x1, y1 = cx + cup_w / 2, cup_cy + cup_h / 2
-        draw.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0)], fill=color, width=lw, joint="curve")
-        handle_w = cup_w * 0.35
-        hy0, hy1 = cup_cy - cup_h * 0.18, cup_cy + cup_h * 0.18
-        draw.line([(x1, hy0), (x1 + handle_w, hy0), (x1 + handle_w, hy1), (x1, hy1)],
-                 fill=color, width=lw, joint="curve")
-        steam_lw = max(2, lw // 2)
-        for dx in (-r * 0.28, r * 0.05):
-            sx = cx + dx
-            draw.line([(sx, y0 - r * 0.05), (sx - r * 0.12, y0 - r * 0.22),
-                      (sx, y0 - r * 0.4)], fill=color, width=steam_lw, joint="curve")
-
-    elif icon_type == "tinaja":
-        tub_w = r * 1.5
-        rim_h = r * 0.34
-        rim_cy = cy - r * 0.05
-        base_cy = rim_cy + r * 0.85
-        draw.ellipse([(cx - tub_w / 2, rim_cy - rim_h / 2),
-                     (cx + tub_w / 2, rim_cy + rim_h / 2)], outline=color, width=lw)
-        draw.line([(cx - tub_w / 2, rim_cy), (cx - tub_w / 2, base_cy)], fill=color, width=lw)
-        draw.line([(cx + tub_w / 2, rim_cy), (cx + tub_w / 2, base_cy)], fill=color, width=lw)
-        draw.arc([(cx - tub_w / 2, base_cy - rim_h / 2),
-                 (cx + tub_w / 2, base_cy + rim_h / 2)], 0, 180, fill=color, width=lw)
-        for frac in (0.3, 0.5, 0.7):
-            sx = cx - tub_w / 2 + tub_w * frac
-            draw.line([(sx, rim_cy + rim_h * 0.2), (sx, base_cy - rim_h * 0.05)],
-                     fill=color, width=max(2, lw // 2))
-        steam_lw = max(2, lw // 2)
-        for dx in (-r * 0.3, r * 0.3):
-            sx = cx + dx
-            draw.line([(sx, rim_cy - rim_h * 0.7), (sx - r * 0.12, rim_cy - rim_h * 0.7 - r * 0.22),
-                      (sx, rim_cy - rim_h * 0.7 - r * 0.45)], fill=color, width=steam_lw, joint="curve")
-
-    elif icon_type == "cama":
-        base_y = cy + r * 0.55
-        head_x = cx - r * 0.95
-        foot_x = cx + r * 0.95
-        mattress_y = cy + r * 0.05
-        draw.line([(head_x, base_y), (head_x, cy - r * 0.55)], fill=color, width=lw)
-        draw.line([(head_x, base_y), (foot_x, base_y)], fill=color, width=lw)
-        draw.line([(foot_x, base_y), (foot_x, mattress_y)], fill=color, width=lw)
-        draw.line([(head_x, mattress_y), (foot_x, mattress_y)], fill=color, width=lw, joint="curve")
-        pillow_x1 = head_x + r * 0.75
-        draw.rectangle([(head_x + r * 0.15, cy - r * 0.35),
-                        (pillow_x1, mattress_y - r * 0.05)], outline=color, width=lw)
-
-    elif icon_type == "familia":
-        def _persona(px, head_r, body_h, body_w):
-            hy = cy - r * 0.15
-            draw.ellipse([(px - head_r, hy - body_h - head_r * 2),
-                         (px + head_r, hy - body_h)], outline=color, width=lw)
-            draw.polygon([(px - body_w, hy), (px - body_w * 0.6, hy - body_h),
-                         (px + body_w * 0.6, hy - body_h), (px + body_w, hy)],
-                        outline=color, width=lw)
-        _persona(cx - r * 0.55, r * 0.22, r * 0.55, r * 0.32)
-        _persona(cx + r * 0.55, r * 0.22, r * 0.55, r * 0.32)
-        _persona(cx, r * 0.16, r * 0.35, r * 0.22)
-
-    elif icon_type == "cubiertos":
-        fx = cx - r * 0.32
-        draw.line([(fx, cy - r), (fx, cy + r)], fill=color, width=lw)
-        for dx in (-r * 0.18, 0, r * 0.18):
-            draw.line([(fx + dx, cy - r), (fx + dx, cy - r * 0.45)], fill=color, width=max(2, lw // 2))
-        draw.line([(fx - r * 0.18, cy - r * 0.45), (fx + r * 0.18, cy - r * 0.45)],
-                 fill=color, width=max(2, lw // 2))
-
-        sx = cx + r * 0.32
-        bowl_w, bowl_h = r * 0.42, r * 0.55
-        draw.ellipse([(sx - bowl_w / 2, cy - r), (sx + bowl_w / 2, cy - r + bowl_h)],
-                     outline=color, width=lw)
-        draw.line([(sx, cy - r + bowl_h), (sx, cy + r)], fill=color, width=lw)
-
-    elif icon_type == "mapa":
-        mw, mh = r * 1.7, r * 1.2
-        x0, y0 = cx - mw / 2, cy - mh / 2 + r * 0.15
-        x1, y1 = cx + mw / 2, cy + mh / 2 + r * 0.15
-        draw.polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], outline=color, width=lw)
-        for frac in (1 / 3, 2 / 3):
-            fx = x0 + mw * frac
-            draw.line([(fx, y0), (fx, y1)], fill=color, width=max(2, lw // 2))
-        pin_cx, pin_r = cx + mw * 0.12, r * 0.28
-        pin_top = cy - r - pin_r * 0.3
-        draw.ellipse([(pin_cx - pin_r, pin_top), (pin_cx + pin_r, pin_top + pin_r * 2)],
-                     outline=color, width=lw)
-        draw.line([(pin_cx, pin_top + pin_r * 1.7), (pin_cx, pin_top + pin_r * 3)],
-                 fill=color, width=lw)
 
     return img.resize((size, size), Image.LANCZOS)
 
