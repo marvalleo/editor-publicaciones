@@ -34,13 +34,26 @@ class SlidesPanel(tk.Frame):
         tk.Label(self, text="🎞  Láminas", bg=self._bg, fg=self._text,
                  font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 2))
 
-        # Sin scroll propio: la lista crece con la cantidad de láminas y el
-        # scroll lo maneja el panel izquierdo que la contiene (evita tener
-        # dos scrolls anidados, uno de ellos con una barra angosta y sin
-        # soporte de rueda del mouse, que dejaba láminas inalcanzables en
-        # carruseles largos).
-        self._rows_frame = tk.Frame(self, bg=self._bg)
-        self._rows_frame.pack(fill=tk.X)
+        # Caja con scroll propio, con barra visible y rueda del mouse
+        # funcionando: la rueda se ata directamente (bind, no bind_all) al
+        # canvas y a cada widget de cada fila, con "break" para que el
+        # evento no siga hacia el scroll del panel izquierdo que la
+        # contiene (evita que ambos scrolls compitan por la rueda).
+        list_container = tk.Frame(self, bg=self._bg)
+        list_container.pack(fill=tk.X)
+        self._list_canvas = tk.Canvas(list_container, bg=self._bg, highlightthickness=0, height=320)
+        scrollbar = tk.Scrollbar(list_container, orient="vertical", command=self._list_canvas.yview)
+        self._rows_frame = tk.Frame(self._list_canvas, bg=self._bg)
+        rows_window = self._list_canvas.create_window((0, 0), window=self._rows_frame, anchor="nw")
+        self._rows_frame.bind(
+            "<Configure>",
+            lambda e: self._list_canvas.configure(scrollregion=self._list_canvas.bbox("all")))
+        self._list_canvas.bind(
+            "<Configure>", lambda e: self._list_canvas.itemconfig(rows_window, width=e.width))
+        self._list_canvas.configure(yscrollcommand=scrollbar.set)
+        self._list_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self._bind_mousewheel(self._list_canvas)
 
         actions = tk.Frame(self, bg=self._bg)
         actions.pack(fill=tk.X, pady=(4, 4))
@@ -65,12 +78,29 @@ class SlidesPanel(tk.Frame):
 
         self.refresh()
 
+    def _bind_mousewheel(self, widget):
+        """Ata la rueda del mouse a `widget` para que scrollee la lista de
+        láminas, y detiene la propagación ("break") para que el mismo
+        evento no siga hacia el scroll del panel izquierdo que la
+        contiene. Se aplica al canvas y, recursivamente, a cada widget de
+        cada fila (thumbnail, botones, labels), porque en Tkinter la
+        rueda del mouse solo dispara sobre el widget que está literalmente
+        bajo el cursor, no sobre sus ancestros."""
+        def _on_mousewheel(event):
+            self._list_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            return "break"
+
+        widget.bind("<MouseWheel>", _on_mousewheel)
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child)
+
     def refresh(self):
         """Reconstruye la lista de miniaturas a partir de app.project.slides."""
         for w in self._rows_frame.winfo_children():
             w.destroy()
         for index, slide in enumerate(self.app.project.slides):
             self._build_row(index, slide)
+        self._bind_mousewheel(self._rows_frame)
 
     def _build_row(self, index, slide):
         is_active = index == self.app.current_slide_index
