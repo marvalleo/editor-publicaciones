@@ -43,7 +43,7 @@ SYSTEM_FONT_DIRS = [
 
 ICONS = ["planta", "montaña", "corazón", "cabaña", "fuego", "río",
          "estrella", "sol", "árbol", "taza", "tinaja", "cama",
-         "familia", "cubiertos", "mapa", "ninguno"]
+         "familia", "cubiertos", "mapa", "nieve", "ninguno"]
 
 ELEMENTS = ["logo", "title", "sub", "desc"]
 

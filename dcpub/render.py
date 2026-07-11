@@ -1,6 +1,5 @@
 """Motor de render: compone la publicación a partir de una lista de capas."""
 
-import math
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
@@ -12,15 +11,22 @@ _bg_cache = {"key": None, "img": None}
 ICONS_DIR = Path(__file__).resolve().parent / "assets" / "icons"
 
 ICON_IMAGE_FILES = {
-    "árbol": "arbol.png",
+    "planta": "planta.png",
+    "montaña": "montana.png",
+    "corazón": "corazon.png",
     "cabaña": "cabana.png",
+    "fuego": "fuego.png",
+    "río": "rio.png",
+    "estrella": "estrella.png",
+    "sol": "sol.png",
+    "árbol": "arbol.png",
+    "taza": "taza.png",
     "tinaja": "tinaja.png",
     "cama": "cama.png",
     "familia": "familia.png",
-    "taza": "taza.png",
     "cubiertos": "cubiertos.png",
     "mapa": "mapa.png",
-    "corazón": "corazon.png",
+    "nieve": "nieve.png",
 }
 
 _icon_mask_cache = {}
@@ -71,88 +77,15 @@ DEFAULT_PALETTE = {
 }
 
 
-ICON_SUPERSAMPLE = 4
-
-
 def draw_icon(size, icon_type, color):
     """Devuelve un ícono de marca de `size`x`size`, listo para componer
-    con `canvas.alpha_composite(img, (x, y))`.
-
-    Para los íconos con imagen fuente en ICON_IMAGE_FILES, recolorea la
-    silueta (canal alfa) de esa imagen dinámicamente con `color`. Para el
-    resto, dibuja a mano a resolución supersampleada (x4) y reescala
-    hacia abajo con LANCZOS para lograr bordes suaves: dibujado directo
-    al tamaño final (~24-70px), PIL no antialiasea líneas/arcos y los
-    íconos quedaban dentados."""
-    if icon_type in ICON_IMAGE_FILES:
-        mask = _fit_mask(_icon_mask(icon_type), size)
-        img = Image.new("RGBA", (size, size), color)
-        img.putalpha(ImageChops.multiply(img.split()[-1], mask))
-        return img
-
-    hi = size * ICON_SUPERSAMPLE
-    img = Image.new("RGBA", (hi, hi), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    lw = max(2, hi // 16)
-    cx, cy = hi // 2, hi // 2
-    r = hi // 2 - lw * 2
-
-    if icon_type == "planta":
-        draw.line([(cx, cy + r), (cx, cy - r // 2)], fill=color, width=lw)
-        draw.arc([(cx - r // 2, cy - r // 2), (cx + lw, cy + lw)], 180, 270, fill=color, width=lw)
-        draw.arc([(cx - lw, cy - r // 2), (cx + r // 2, cy + lw)], 270, 360, fill=color, width=lw)
-
-    elif icon_type == "montaña":
-        pts1 = [(cx - r, cy + r), (cx, cy - r), (cx + r, cy + r)]
-        for i in range(len(pts1)):
-            draw.line([pts1[i], pts1[(i + 1) % len(pts1)]], fill=color, width=lw)
-        pts2 = [(cx, cy + r), (cx + r * 2 // 3, cy - r // 2), (cx + r, cy + r)]
-        for i in range(len(pts2)):
-            draw.line([pts2[i], pts2[(i + 1) % len(pts2)]], fill=color, width=lw)
-
-    elif icon_type == "fuego":
-        pts = [
-            (cx, cy - r),
-            (cx - r * 0.5, cy - r * 0.25),
-            (cx - r * 0.65, cy + r * 0.35),
-            (cx - r * 0.15, cy + r * 0.85),
-            (cx, cy + r * 0.6),
-            (cx + r * 0.15, cy + r * 0.85),
-            (cx + r * 0.65, cy + r * 0.35),
-            (cx + r * 0.5, cy - r * 0.25),
-            (cx, cy - r),
-        ]
-        draw.line(pts, fill=color, width=lw, joint="curve")
-
-    elif icon_type == "río":
-        for offset, amp in ((-r * 0.28, r * 0.22), (r * 0.32, r * 0.22)):
-            base_y = cy + offset
-            pts = [(cx - r, base_y - amp), (cx - r * 0.33, base_y + amp),
-                   (cx + r * 0.33, base_y - amp), (cx + r, base_y + amp)]
-            draw.line(pts, fill=color, width=lw, joint="curve")
-
-    elif icon_type == "estrella":
-        pts = []
-        for i in range(10):
-            ang = math.pi / 2 + i * math.pi / 5
-            rad = r if i % 2 == 0 else r * 0.42
-            pts.append((cx + rad * math.cos(ang), cy - rad * math.sin(ang)))
-        draw.polygon(pts, outline=color, width=lw)
-
-    elif icon_type == "sol":
-        sun_r = r * 0.55
-        draw.ellipse([(cx - sun_r, cy - sun_r), (cx + sun_r, cy + sun_r)],
-                     outline=color, width=lw)
-        for i in range(8):
-            ang = i * math.pi / 4
-            x0 = cx + math.cos(ang) * (sun_r + lw)
-            y0 = cy + math.sin(ang) * (sun_r + lw)
-            x1 = cx + math.cos(ang) * r
-            y1 = cy + math.sin(ang) * r
-            draw.line([(x0, y0), (x1, y1)], fill=color, width=lw)
-
-    return img.resize((size, size), Image.LANCZOS)
+    con `canvas.alpha_composite(img, (x, y))`: recolorea dinámicamente
+    con `color` la silueta (canal alfa) de la imagen fuente del ícono en
+    ICON_IMAGE_FILES."""
+    mask = _fit_mask(_icon_mask(icon_type), size)
+    img = Image.new("RGBA", (size, size), color)
+    img.putalpha(ImageChops.multiply(img.split()[-1], mask))
+    return img
 
 
 def wrap_text(text, font, max_w, draw):
