@@ -41,7 +41,8 @@ SYSTEM_FONT_DIRS = [
     Path("/System/Library/Fonts"),
 ]
 
-ICONS = ["planta", "montaña", "corazón", "cabaña", "ninguno"]
+ICONS = ["planta", "montaña", "corazón", "cabaña", "fuego", "río",
+         "estrella", "sol", "árbol", "taza", "ninguno"]
 
 ELEMENTS = ["logo", "title", "sub", "desc"]
 

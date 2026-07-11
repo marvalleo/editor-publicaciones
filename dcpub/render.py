@@ -1,5 +1,6 @@
 """Motor de render: compone la publicación a partir de una lista de capas."""
 
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
@@ -75,6 +76,64 @@ def draw_icon(size, icon_type, color):
         draw.rectangle([(cx - hw, cy), (cx + hw, cy + r)], outline=color, width=lw)
         pw = hw // 2
         draw.rectangle([(cx - pw // 2, cy + r // 2), (cx + pw // 2, cy + r)], outline=color, width=lw)
+
+    elif icon_type == "fuego":
+        pts = [
+            (cx, cy - r),
+            (cx - r * 0.5, cy - r * 0.25),
+            (cx - r * 0.65, cy + r * 0.35),
+            (cx - r * 0.15, cy + r * 0.85),
+            (cx, cy + r * 0.6),
+            (cx + r * 0.15, cy + r * 0.85),
+            (cx + r * 0.65, cy + r * 0.35),
+            (cx + r * 0.5, cy - r * 0.25),
+            (cx, cy - r),
+        ]
+        draw.line(pts, fill=color, width=lw, joint="curve")
+
+    elif icon_type == "río":
+        for offset, amp in ((-r * 0.28, r * 0.22), (r * 0.32, r * 0.22)):
+            base_y = cy + offset
+            pts = [(cx - r, base_y - amp), (cx - r * 0.33, base_y + amp),
+                   (cx + r * 0.33, base_y - amp), (cx + r, base_y + amp)]
+            draw.line(pts, fill=color, width=lw, joint="curve")
+
+    elif icon_type == "estrella":
+        pts = []
+        for i in range(10):
+            ang = math.pi / 2 + i * math.pi / 5
+            rad = r if i % 2 == 0 else r * 0.42
+            pts.append((cx + rad * math.cos(ang), cy - rad * math.sin(ang)))
+        draw.polygon(pts, outline=color, width=lw)
+
+    elif icon_type == "sol":
+        sun_r = r * 0.55
+        draw.ellipse([(cx - sun_r, cy - sun_r), (cx + sun_r, cy + sun_r)],
+                     outline=color, width=lw)
+        for i in range(8):
+            ang = i * math.pi / 4
+            x0 = cx + math.cos(ang) * (sun_r + lw)
+            y0 = cy + math.sin(ang) * (sun_r + lw)
+            x1 = cx + math.cos(ang) * r
+            y1 = cy + math.sin(ang) * r
+            draw.line([(x0, y0), (x1, y1)], fill=color, width=lw)
+
+    elif icon_type == "árbol":
+        draw.polygon([(cx - r * 0.85, cy + r * 0.15), (cx, cy - r), (cx + r * 0.85, cy + r * 0.15)],
+                     outline=color, width=lw)
+        draw.polygon([(cx - r * 0.6, cy + r * 0.55), (cx, cy - r * 0.25), (cx + r * 0.6, cy + r * 0.55)],
+                     outline=color, width=lw)
+        draw.line([(cx, cy + r * 0.5), (cx, cy + r)], fill=color, width=lw)
+
+    elif icon_type == "taza":
+        cup_w, cup_h = r * 1.0, r * 0.85
+        x0, y0 = cx - cup_w / 2, cy - cup_h / 2
+        x1, y1 = cx + cup_w / 2, cy + cup_h / 2
+        draw.line([(x0, y0), (x0, y1), (x1, y1), (x1, y0)], fill=color, width=lw, joint="curve")
+        handle_w = cup_w * 0.35
+        hy0, hy1 = cy - cup_h * 0.18, cy + cup_h * 0.18
+        draw.line([(x1, hy0), (x1 + handle_w, hy0), (x1 + handle_w, hy1), (x1, hy1)],
+                 fill=color, width=lw, joint="curve")
 
     return img.resize((size, size), Image.LANCZOS)
 
